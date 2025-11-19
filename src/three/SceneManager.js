@@ -1,4 +1,4 @@
-import * as THREE from "three";
+import * as THREE from "three/webgpu";
 import { createGBuffer, resizeGBuffer } from "./gbuffer.js";
 import { createGBufferMaterial } from "./materials/GBufferMaterial.js";
 import { PostProcessingMaterial } from "./materials/PostMaterial.js";
@@ -99,11 +99,11 @@ export class SceneManager {
     const prev = this.scenes.get(this.activePrevId);
     const next = this.scenes.get(this.activeNextId);
 
-    // Update scenes
     if (prev?.update) prev.update(timeMs);
+    // Only update next scene if set
     if (next?.update && next !== prev) next.update(timeMs);
 
-    // GBuffer pass: prev
+    // Prev scene
     if (prev) {
       renderer.setRenderTarget(prev.gbuffer.target);
       renderer.setMRT(
@@ -120,7 +120,7 @@ export class SceneManager {
       renderer.setMRT(null);
     }
 
-    // GBuffer pass: next
+    // Next scene
     if (next) {
       renderer.setRenderTarget(next.gbuffer.target);
       renderer.setMRT(
@@ -137,7 +137,7 @@ export class SceneManager {
       renderer.setMRT(null);
     }
 
-    // Post: combine prev and next
+    // Both active
     if (prev && next) {
       this.post.setInputs({
         prev: prev.gbuffer.albedo,

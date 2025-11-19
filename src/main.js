@@ -1,9 +1,10 @@
 import { bus } from "./events/bus.js";
 import { useViewportStore } from "./state/store.js";
-import { setupPane } from "./ui/pane.js";
 import { WebGPURenderer } from "three/webgpu";
 import { SceneManager } from "./three/SceneManager.js";
 import { RotatingCubeScene } from "./scenes/RotatingCubeScene.js";
+import { getFlag } from "./lib/query.js";
+import Stats from "stats.js";
 
 const canvas = document.getElementById("app-canvas");
 
@@ -44,6 +45,15 @@ async function main() {
 
   setCanvasSize(renderer);
 
+  // Optional debug stats
+  const debug = getFlag("debug");
+  let stats = null;
+  if (debug) {
+    stats = new Stats();
+    stats.showPanel(0);
+    document.body.appendChild(stats.dom);
+  }
+
   const controlsA = {
     rotateX: 0.6,
     rotateY: 0.9,
@@ -55,8 +65,6 @@ async function main() {
   const sceneA = sceneAObj.scene;
   const cameraA = sceneAObj.camera;
   const updateA = sceneAObj.update.bind(sceneAObj);
-  const setCubeColorA = sceneAObj.setCubeColor.bind(sceneAObj);
-  const setLightIntensityA = sceneAObj.setLightIntensity.bind(sceneAObj);
 
   // Simple second scene with different styling
   const controlsB = {
@@ -70,10 +78,8 @@ async function main() {
   const cameraB = sceneBObj.camera;
   const updateB = sceneBObj.update.bind(sceneBObj);
 
-  setupPane(controlsA, {
-    setCubeColor: setCubeColorA,
-    setLightIntensity: setLightIntensityA,
-  });
+  if (debug) {
+  }
 
   const sceneManager = new SceneManager(renderer);
   const idA = sceneManager.addScene({
@@ -100,16 +106,18 @@ async function main() {
     sceneManager.resize({
       width,
       height,
-      devicePixelRatio: window.devicePixelRatio || 1,
+      devicePixelRatio: useViewportStore.getState().viewport.devicePixelRatio,
     });
   });
 
   renderer.setAnimationLoop((time) => {
+    if (stats) stats.begin();
     // Blend the two scenes over time
     const t = time * 0.001;
     const mixValue = 0.5 + 0.5 * Math.sin(t * 0.5);
     sceneManager.setMix(mixValue);
     sceneManager.render(time);
+    if (stats) stats.end();
   });
 }
 

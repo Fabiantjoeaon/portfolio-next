@@ -1,4 +1,4 @@
-import * as THREE from "three";
+import * as THREE from "three/webgpu";
 import { BaseScene } from "./BaseScene.js";
 
 export class TestScene extends BaseScene {
@@ -46,13 +46,5 @@ export class TestScene extends BaseScene {
     const t = elapsedMs * 0.001;
     this.cube.rotation.x = t * this.rotateX;
     this.cube.rotation.y = t * this.rotateY;
-  }
-
-  setCubeColor(hex) {
-    this.cube.material.color.set(hex);
-  }
-
-  setLightIntensity(intensity) {
-    this.directionalLight.intensity = intensity;
   }
 }

@@ -1,4 +1,4 @@
-import * as THREE from "three";
+import * as THREE from "three/webgpu";
 import { color } from "three/tsl";
 import { NodeMaterial } from "three/webgpu";
 
