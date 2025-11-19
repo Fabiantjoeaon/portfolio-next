@@ -1,4 +1,15 @@
-import { texture, uv, mix, uniform, vec3 } from "three/tsl";
+import {
+  texture,
+  uv,
+  mix,
+  uniform,
+  vec3,
+  smoothstep,
+  sub,
+  add,
+  mul,
+  clamp,
+} from "three/tsl";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 
 /**
@@ -12,6 +23,8 @@ export class PostProcessingMaterial {
 
     // Uniform mix factor (0..1)
     this.mixNode = uniform(0.0);
+    // Feather width around the swipe edge in UV space (default small)
+    this.featherNode = uniform(0.02);
 
     // Placeholders; will be set via setters
     this.prevTex = null;
@@ -26,11 +39,17 @@ export class PostProcessingMaterial {
     if (this.prevTex && this.nextTex) {
       const prevSample = texture(this.prevTex, uv());
       const nextSample = texture(this.nextTex, uv());
-      this.material.colorNode = mix(
-        prevSample.rgb,
-        nextSample.rgb,
-        this.mixNode
-      );
+
+      // UV.x from fullscreen triangle spans ~0..2; rescale to 0..1
+      const u = uv().x;
+      const u01 = clamp(mul(u, 0.5), 0.0, 1.0);
+
+      // Swipe left->right with feather
+      const edge0 = sub(this.mixNode, this.featherNode);
+      const edge1 = add(this.mixNode, this.featherNode);
+      const swipe = smoothstep(edge0, edge1, u01);
+
+      this.material.colorNode = mix(prevSample.rgb, nextSample.rgb, swipe);
     } else if (this.prevTex) {
       const prevSample = texture(this.prevTex, uv());
       this.material.colorNode = prevSample.rgb;
@@ -65,5 +84,9 @@ export class PostProcessingMaterial {
 
   setMix(value) {
     this.mixNode.value = value;
+  }
+
+  setFeather(value) {
+    this.featherNode.value = value;
   }
 }

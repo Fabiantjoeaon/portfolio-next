@@ -2,11 +2,9 @@ import { bus } from "./events/bus.js";
 import { useViewportStore } from "./state/store.js";
 import { WebGPURenderer } from "three/webgpu";
 import { SceneManager } from "./three/SceneManager.js";
-import { RotatingCubeScene } from "./scenes/RotatingCubeScene.js";
 import { getFlag } from "./lib/query.js";
 import Stats from "stats.js";
-import { TestScene } from "./scenes/TestScene.js";
-import pane from "./ui/pane.js";
+import { orderedScenes, createScenes } from "./scenes/index.js";
 
 class App {
   constructor() {
@@ -16,8 +14,12 @@ class App {
     this.debug = getFlag("debug");
     this.stats = null;
 
-    this.sceneAObj = null;
-    this.sceneBObj = null;
+    this.sceneInstances = [];
+    this.sceneIds = [];
+    this.prevIdx = 0;
+    this.nextIdx = 1;
+    this.transitionStart = 0;
+    this.transitionDuration = 3000; // ms
 
     this.onResize = this.onResize.bind(this);
     this.render = this.render.bind(this);
@@ -54,26 +56,21 @@ class App {
   }
 
   async setupScenes() {
-    this.sceneAObj = new TestScene();
-    this.sceneBObj = new RotatingCubeScene();
-
-    if (this.debug) {
-    }
-
+    // Instantiate scenes in declared order
+    this.sceneInstances = createScenes();
     this.sceneManager = new SceneManager(this.renderer);
-    const idA = this.sceneManager.addScene({
-      scene: this.sceneAObj.scene,
-      camera: this.sceneAObj.camera,
-      update: this.sceneAObj.update.bind(this.sceneAObj),
-      albedoHex: 0x6ee7b7,
-    });
-    const idB = this.sceneManager.addScene({
-      scene: this.sceneBObj.scene,
-      camera: this.sceneBObj.camera,
-      update: this.sceneBObj.update.bind(this.sceneBObj),
-      albedoHex: 0x60a5fa,
-    });
-    this.sceneManager.setActivePair(idA, idB);
+    this.sceneIds = this.sceneInstances.map((inst) =>
+      this.sceneManager.addScene(inst)
+    );
+
+    // Initialize active pair
+    this.prevIdx = 0;
+    this.nextIdx = this.sceneIds.length > 1 ? 1 : 0;
+    this.sceneManager.setActivePair(
+      this.sceneIds[this.prevIdx],
+      this.sceneIds[this.nextIdx]
+    );
+    this.transitionStart = performance.now();
   }
 
   onResize() {
@@ -84,7 +81,18 @@ class App {
     this.renderer.setPixelRatio(devicePixelRatio);
     this.renderer.setSize(width, height, false);
 
-    // TODO: Resize current scenes
+    // Update active cameras
+    const prevInst = this.sceneInstances[this.prevIdx];
+    const nextInst = this.sceneInstances[this.nextIdx];
+    if (prevInst?.camera) {
+      prevInst.camera.aspect = width / height;
+      prevInst.camera.updateProjectionMatrix();
+    }
+    if (nextInst?.camera && nextInst !== prevInst) {
+      nextInst.camera.aspect = width / height;
+      nextInst.camera.updateProjectionMatrix();
+    }
+
     this.sceneManager?.resize({
       width,
       height,
@@ -96,13 +104,33 @@ class App {
       height,
       devicePixelRatio,
     });
+    bus.emit("resize", { width, height, devicePixelRatio });
   }
 
   render(time) {
     if (this.stats) this.stats.begin();
-    const t = time * 0.001;
-    const mixValue = 0.5 + 0.5 * Math.sin(t * 0.5);
+
+    if (this.sceneIds.length === 0) {
+      if (this.stats) this.stats.end();
+      return;
+    }
+
+    // Linear transition 0..1 over transitionDuration
+    const elapsed = time - this.transitionStart;
+    let mixValue = Math.min(Math.max(elapsed / this.transitionDuration, 0), 1);
     this.sceneManager.setMix(mixValue);
+
+    if (mixValue >= 1 && this.sceneIds.length > 1) {
+      // Advance to next scene in order
+      this.prevIdx = this.nextIdx;
+      this.nextIdx = (this.nextIdx + 1) % this.sceneIds.length;
+      this.sceneManager.setActivePair(
+        this.sceneIds[this.prevIdx],
+        this.sceneIds[this.nextIdx]
+      );
+      this.transitionStart = time;
+    }
+
     this.sceneManager.render(time);
     if (this.stats) this.stats.end();
   }

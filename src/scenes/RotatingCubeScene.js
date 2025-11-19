@@ -35,6 +35,7 @@ export class RotatingCubeScene extends BaseScene {
     });
     this.cube = new THREE.Mesh(geometry, material);
     this.scene.add(this.cube);
+    this.albedoHex = material.color.getHex();
 
     const grid = new THREE.GridHelper(10, 10, 0x334155, 0x1f2937);
     this.scene.add(grid);

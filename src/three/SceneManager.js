@@ -50,17 +50,18 @@ export class SceneManager {
     this.postScene = new PostProcessingScene(this.post.material);
   }
 
-  addScene(payload) {
+  addScene(sceneObj) {
     const id = _nextSceneId++;
     const { width, height, devicePixelRatio } = this.viewport;
 
     const gbuffer = createGBuffer(width, height, devicePixelRatio);
-    const gbufferMat = createGBufferMaterial(payload?.albedoHex ?? 0xffffff);
+    const gbufferMat = createGBufferMaterial(sceneObj?.albedoHex ?? 0xffffff);
 
     this.scenes.set(id, {
-      scene: payload.scene,
-      camera: payload.camera,
-      update: payload.update ?? (() => {}),
+      scene: sceneObj.scene,
+      camera: sceneObj.camera,
+      update: sceneObj.update?.bind?.(sceneObj) ?? (() => {}),
+      sceneObj,
       gbuffer,
       gbufferMat,
     });
