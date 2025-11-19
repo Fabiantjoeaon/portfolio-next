@@ -7,6 +7,29 @@ import { mrt, output, normalView } from "three/tsl";
 
 let _nextSceneId = 1;
 
+function hideObjectsWithoutNormals(root) {
+  const modified = [];
+  root.traverse((obj) => {
+    if (obj.isMesh) {
+      const geom = obj.geometry;
+      const hasNormals = !!geom?.attributes?.normal;
+      if (!hasNormals && obj.visible !== false) {
+        modified.push({ obj, prevVisible: obj.visible });
+        obj.visible = false;
+      }
+    } else if (!obj.isScene) {
+      // Hide non-mesh renderables like helpers/lines during GBuffer
+      if (obj.visible !== false) {
+        modified.push({ obj, prevVisible: obj.visible });
+        obj.visible = false;
+      }
+    }
+  });
+  return () => {
+    for (const m of modified) m.obj.visible = m.prevVisible;
+  };
+}
+
 export class SceneManager {
   constructor(renderer) {
     this.renderer = renderer;
@@ -79,29 +102,6 @@ export class SceneManager {
     // Update scenes
     if (prev?.update) prev.update(timeMs);
     if (next?.update && next !== prev) next.update(timeMs);
-
-    function hideObjectsWithoutNormals(root) {
-      const modified = [];
-      root.traverse((obj) => {
-        if (obj.isMesh) {
-          const geom = obj.geometry;
-          const hasNormals = !!geom?.attributes?.normal;
-          if (!hasNormals && obj.visible !== false) {
-            modified.push({ obj, prevVisible: obj.visible });
-            obj.visible = false;
-          }
-        } else if (!obj.isScene) {
-          // Hide non-mesh renderables like helpers/lines during GBuffer
-          if (obj.visible !== false) {
-            modified.push({ obj, prevVisible: obj.visible });
-            obj.visible = false;
-          }
-        }
-      });
-      return () => {
-        for (const m of modified) m.obj.visible = m.prevVisible;
-      };
-    }
 
     // GBuffer pass: prev
     if (prev) {

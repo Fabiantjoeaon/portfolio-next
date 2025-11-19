@@ -1,13 +1,12 @@
 import * as THREE from "three";
 import { BaseScene } from "./BaseScene.js";
 
-export class RotatingCubeScene extends BaseScene {
+export class TestScene extends BaseScene {
   constructor(controls) {
     super();
     this.scene.background = new THREE.Color(0x0b0e12);
 
     const { innerWidth, innerHeight } = window;
-
     this.camera = new THREE.PerspectiveCamera(
       60,
       innerWidth / innerHeight,
@@ -49,6 +48,11 @@ export class RotatingCubeScene extends BaseScene {
     this.cube.rotation.y = t * this.rotateY;
   }
 
-  setCubeColor(hex) {}
-  setLightIntensity(intensity) {}
+  setCubeColor(hex) {
+    this.cube.material.color.set(hex);
+  }
+
+  setLightIntensity(intensity) {
+    this.directionalLight.intensity = intensity;
+  }
 }
