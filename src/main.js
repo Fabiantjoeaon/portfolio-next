@@ -2,6 +2,7 @@ import { bus } from "./events/bus.js";
 import { useViewportStore } from "./state/store.js";
 import { WebGPURenderer } from "three/webgpu";
 import { SceneManager } from "./three/SceneManager.js";
+import { TransitionManager } from "./three/TransitionManager.js";
 import { getFlag } from "./lib/query.js";
 import Stats from "stats.js";
 import { orderedScenes, createScenes } from "./scenes/index.js";
@@ -16,10 +17,7 @@ class App {
 
     this.sceneInstances = [];
     this.sceneIds = [];
-    this.prevIdx = 0;
-    this.nextIdx = 1;
-    this.transitionStart = 0;
-    this.transitionDuration = 3000; // ms
+    this.transitionManager = null;
 
     this.onResize = this.onResize.bind(this);
     this.render = this.render.bind(this);
@@ -52,6 +50,7 @@ class App {
 
     this.onResize();
     window.addEventListener("resize", this.onResize);
+
     this.renderer.setAnimationLoop(this.render);
   }
 
@@ -62,15 +61,28 @@ class App {
     this.sceneIds = this.sceneInstances.map((inst) =>
       this.sceneManager.addScene(inst)
     );
+    this.transitionManager = new TransitionManager(this.sceneManager);
+    this.transitionManager.setSequence(this.sceneIds, this.sceneInstances);
+    this.transitionManager.start(performance.now());
+  }
 
-    // Initialize active pair
-    this.prevIdx = 0;
-    this.nextIdx = this.sceneIds.length > 1 ? 1 : 0;
-    this.sceneManager.setActivePair(
-      this.sceneIds[this.prevIdx],
-      this.sceneIds[this.nextIdx]
-    );
-    this.transitionStart = performance.now();
+  createOverlay() {
+    const el = document.createElement("div");
+    el.id = "debug-overlay";
+    el.style.position = "fixed";
+    el.style.top = "8px";
+    el.style.left = "8px";
+    el.style.zIndex = "9999";
+    el.style.pointerEvents = "none";
+    el.style.background = "rgba(15, 23, 42, 0.7)";
+    el.style.color = "#e2e8f0";
+    el.style.fontFamily =
+      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
+    el.style.fontSize = "12px";
+    el.style.padding = "6px 8px";
+    el.style.borderRadius = "6px";
+    document.body.appendChild(el);
+    this.overlayEl = el;
   }
 
   onResize() {
@@ -81,9 +93,11 @@ class App {
     this.renderer.setPixelRatio(devicePixelRatio);
     this.renderer.setSize(width, height, false);
 
-    // Update active cameras
-    const prevInst = this.sceneInstances[this.prevIdx];
-    const nextInst = this.sceneInstances[this.nextIdx];
+    // Update active cameras (transition manager sets active pair)
+    const activePrevId = this.sceneManager.activePrevId;
+    const activeNextId = this.sceneManager.activeNextId;
+    const prevInst = this.sceneInstances[this.sceneIds.indexOf(activePrevId)];
+    const nextInst = this.sceneInstances[this.sceneIds.indexOf(activeNextId)];
     if (prevInst?.camera) {
       prevInst.camera.aspect = width / height;
       prevInst.camera.updateProjectionMatrix();
@@ -115,21 +129,7 @@ class App {
       return;
     }
 
-    // Linear transition 0..1 over transitionDuration
-    const elapsed = time - this.transitionStart;
-    let mixValue = Math.min(Math.max(elapsed / this.transitionDuration, 0), 1);
-    this.sceneManager.setMix(mixValue);
-
-    if (mixValue >= 1 && this.sceneIds.length > 1) {
-      // Advance to next scene in order
-      this.prevIdx = this.nextIdx;
-      this.nextIdx = (this.nextIdx + 1) % this.sceneIds.length;
-      this.sceneManager.setActivePair(
-        this.sceneIds[this.prevIdx],
-        this.sceneIds[this.nextIdx]
-      );
-      this.transitionStart = time;
-    }
+    this.transitionManager?.update(time);
 
     this.sceneManager.render(time);
     if (this.stats) this.stats.end();

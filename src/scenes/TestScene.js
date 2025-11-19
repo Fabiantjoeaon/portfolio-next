@@ -28,7 +28,7 @@ export class TestScene extends BaseScene {
 
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     const material = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(controls?.color ?? 0x6ee7b7),
+      color: new THREE.Color(0xff0000),
       roughness: 0.35,
       metalness: 0.1,
     });

@@ -1,0 +1,10 @@
+- Find way to have an object consistent across scenes
+
+- Offscreen rendering?
+    - https://claude.ai/chat/f4145cd5-a15b-4ee7-9c62-de5fb3b9cccf
+
+
+- Port over grid
+    - Make screen adaptive + mobile version
+
+- Particle system

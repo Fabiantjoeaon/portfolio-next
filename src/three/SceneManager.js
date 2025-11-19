@@ -17,8 +17,13 @@ function hideObjectsWithoutNormals(root) {
         obj.visible = false;
       }
     } else if (!obj.isScene) {
-      // Hide non-mesh renderables like helpers/lines during GBuffer
-      if (obj.visible !== false) {
+      // Hide only line-like helpers and point-based objects; keep groups/empty containers visible
+      const shouldHide =
+        obj.isLine === true ||
+        obj.isLineSegments === true ||
+        obj.isPoints === true ||
+        obj.isSprite === true;
+      if (shouldHide && obj.visible !== false) {
         modified.push({ obj, prevVisible: obj.visible });
         obj.visible = false;
       }
@@ -107,7 +112,7 @@ export class SceneManager {
     // Only update next scene if set
     if (next?.update && next !== prev) next.update(timeMs);
 
-    // Prev scene
+    // Prev scene GBuffer
     if (prev) {
       renderer.setRenderTarget(prev.gbuffer.target);
       renderer.setMRT(
@@ -124,7 +129,7 @@ export class SceneManager {
       renderer.setMRT(null);
     }
 
-    // Next scene
+    // Next scene GBuffer
     if (next) {
       renderer.setRenderTarget(next.gbuffer.target);
       renderer.setMRT(

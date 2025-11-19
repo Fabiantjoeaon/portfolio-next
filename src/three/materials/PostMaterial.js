@@ -1,15 +1,4 @@
-import {
-  texture,
-  uv,
-  mix,
-  uniform,
-  vec3,
-  smoothstep,
-  sub,
-  add,
-  mul,
-  clamp,
-} from "three/tsl";
+import { texture, uv, mix, uniform, vec3 } from "three/tsl";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 
 /**
@@ -23,7 +12,7 @@ export class PostProcessingMaterial {
 
     // Uniform mix factor (0..1)
     this.mixNode = uniform(0.0);
-    // Feather width around the swipe edge in UV space (default small)
+    // Deprecated: transitions should manage their own params; kept for backward compat (unused by default)
     this.featherNode = uniform(0.02);
 
     // Placeholders; will be set via setters
@@ -31,25 +20,24 @@ export class PostProcessingMaterial {
     this.nextTex = null;
     this.lastPrev = null;
     this.lastNext = null;
+    this.transition = null;
 
     this.rebuildGraph();
   }
 
   rebuildGraph() {
-    if (this.prevTex && this.nextTex) {
-      const prevSample = texture(this.prevTex, uv());
-      const nextSample = texture(this.nextTex, uv());
-
-      // UV.x from fullscreen triangle spans ~0..2; rescale to 0..1
-      const u = uv().x;
-      const u01 = clamp(mul(u, 0.5), 0.0, 1.0);
-
-      // Swipe left->right with feather
-      const edge0 = sub(this.mixNode, this.featherNode);
-      const edge1 = add(this.mixNode, this.featherNode);
-      const swipe = smoothstep(edge0, edge1, u01);
-
-      this.material.colorNode = mix(prevSample.rgb, nextSample.rgb, swipe);
+    if (this.prevTex && this.nextTex && this.transition) {
+      const colorNode = this.transition.buildColorNode({
+        prevTex: this.prevTex,
+        nextTex: this.nextTex,
+        uvNode: uv(),
+        mixNode: this.mixNode,
+        prevNormal: this.prevNormal,
+        prevDepth: this.prevDepth,
+        nextNormal: this.nextNormal,
+        nextDepth: this.nextDepth,
+      });
+      this.material.colorNode = colorNode ?? vec3(0.0, 0.0, 0.0);
     } else if (this.prevTex) {
       const prevSample = texture(this.prevTex, uv());
       this.material.colorNode = prevSample.rgb;
@@ -69,11 +57,11 @@ export class PostProcessingMaterial {
     this.prevTex = newPrev;
     this.nextTex = newNext;
 
-    // Optional (kept for future effects)
-    // inputs.prevNormal
-    // inputs.prevDepth
-    // inputs.nextNormal
-    // inputs.nextDepth
+    // Optional GBuffer attachments
+    this.prevNormal = inputs.prevNormal ?? this.prevNormal ?? null;
+    this.prevDepth = inputs.prevDepth ?? this.prevDepth ?? null;
+    this.nextNormal = inputs.nextNormal ?? this.nextNormal ?? null;
+    this.nextDepth = inputs.nextDepth ?? this.nextDepth ?? null;
 
     if (changed) {
       this.lastPrev = this.prevTex;
@@ -88,5 +76,10 @@ export class PostProcessingMaterial {
 
   setFeather(value) {
     this.featherNode.value = value;
+  }
+
+  setTransition(transition) {
+    this.transition = transition ?? null;
+    this.rebuildGraph();
   }
 }
