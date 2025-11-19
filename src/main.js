@@ -5,120 +5,107 @@ import { SceneManager } from "./three/SceneManager.js";
 import { RotatingCubeScene } from "./scenes/RotatingCubeScene.js";
 import { getFlag } from "./lib/query.js";
 import Stats from "stats.js";
+import { TestScene } from "./scenes/TestScene.js";
+import pane from "./ui/pane.js";
 
-const canvas = document.getElementById("app-canvas");
+class App {
+  constructor() {
+    this.canvas = document.getElementById("app-canvas");
+    this.renderer = null;
+    this.sceneManager = null;
+    this.debug = getFlag("debug");
+    this.stats = null;
 
-function setCanvasSize(renderer) {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-  const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    this.sceneAObj = null;
+    this.sceneBObj = null;
 
-  renderer.setPixelRatio(devicePixelRatio);
-  renderer.setSize(width, height, false);
-
-  useViewportStore.getState().setViewport({
-    width,
-    height,
-    devicePixelRatio,
-  });
-
-  bus.emit("resize", { width, height, devicePixelRatio });
-}
-
-async function main() {
-  if (!("gpu" in navigator)) {
-    const message = document.createElement("div");
-    message.id = "no-webgpu";
-    message.textContent = "WebGPU is not supported in this browser.";
-    document.body.appendChild(message);
-    return;
+    this.onResize = this.onResize.bind(this);
+    this.render = this.render.bind(this);
   }
 
-  const renderer = new WebGPURenderer({
-    canvas,
-    antialias: true,
-    alpha: true,
-    powerPreference: "high-performance",
-  });
+  async init() {
+    if (!("gpu" in navigator)) {
+      const message = document.createElement("div");
+      message.id = "no-webgpu";
+      message.textContent = "WebGPU is not supported in this browser.";
+      document.body.appendChild(message);
+      return;
+    }
 
-  await renderer.init();
+    this.renderer = new WebGPURenderer({
+      canvas: this.canvas,
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance",
+    });
+    await this.renderer.init();
 
-  setCanvasSize(renderer);
+    if (this.debug) {
+      this.stats = new Stats();
+      this.stats.showPanel(0);
+      document.body.appendChild(this.stats.dom);
+    }
 
-  // Optional debug stats
-  const debug = getFlag("debug");
-  let stats = null;
-  if (debug) {
-    stats = new Stats();
-    stats.showPanel(0);
-    document.body.appendChild(stats.dom);
+    await this.setupScenes();
+
+    this.onResize();
+    window.addEventListener("resize", this.onResize);
+    this.renderer.setAnimationLoop(this.render);
   }
 
-  const controlsA = {
-    rotateX: 0.6,
-    rotateY: 0.9,
-    color: "#6ee7b7",
-    lightIntensity: 1.0,
-  };
+  async setupScenes() {
+    this.sceneAObj = new TestScene();
+    this.sceneBObj = new RotatingCubeScene();
 
-  const sceneAObj = new RotatingCubeScene(controlsA);
-  const sceneA = sceneAObj.scene;
-  const cameraA = sceneAObj.camera;
-  const updateA = sceneAObj.update.bind(sceneAObj);
+    if (this.debug) {
+    }
 
-  // Simple second scene with different styling
-  const controlsB = {
-    rotateX: 0.4,
-    rotateY: -0.7,
-    color: "#60a5fa",
-    lightIntensity: 0.8,
-  };
-  const sceneBObj = new RotatingCubeScene(controlsB);
-  const sceneB = sceneBObj.scene;
-  const cameraB = sceneBObj.camera;
-  const updateB = sceneBObj.update.bind(sceneBObj);
-
-  if (debug) {
+    this.sceneManager = new SceneManager(this.renderer);
+    const idA = this.sceneManager.addScene({
+      scene: this.sceneAObj.scene,
+      camera: this.sceneAObj.camera,
+      update: this.sceneAObj.update.bind(this.sceneAObj),
+      albedoHex: 0x6ee7b7,
+    });
+    const idB = this.sceneManager.addScene({
+      scene: this.sceneBObj.scene,
+      camera: this.sceneBObj.camera,
+      update: this.sceneBObj.update.bind(this.sceneBObj),
+      albedoHex: 0x60a5fa,
+    });
+    this.sceneManager.setActivePair(idA, idB);
   }
 
-  const sceneManager = new SceneManager(renderer);
-  const idA = sceneManager.addScene({
-    scene: sceneA,
-    camera: cameraA,
-    update: updateA,
-    albedoHex: 0x6ee7b7,
-  });
-  const idB = sceneManager.addScene({
-    scene: sceneB,
-    camera: cameraB,
-    update: updateB,
-    albedoHex: 0x60a5fa,
-  });
-  sceneManager.setActivePair(idA, idB);
+  onResize() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
 
-  window.addEventListener("resize", () => {
-    setCanvasSize(renderer);
-    const { width, height } = useViewportStore.getState().viewport;
-    cameraA.aspect = width / height;
-    cameraA.updateProjectionMatrix();
-    cameraB.aspect = width / height;
-    cameraB.updateProjectionMatrix();
-    sceneManager.resize({
+    this.renderer.setPixelRatio(devicePixelRatio);
+    this.renderer.setSize(width, height, false);
+
+    // TODO: Resize current scenes
+    this.sceneManager?.resize({
       width,
       height,
-      devicePixelRatio: useViewportStore.getState().viewport.devicePixelRatio,
+      devicePixelRatio,
     });
-  });
 
-  renderer.setAnimationLoop((time) => {
-    if (stats) stats.begin();
-    // Blend the two scenes over time
+    useViewportStore.getState().setViewport({
+      width,
+      height,
+      devicePixelRatio,
+    });
+  }
+
+  render(time) {
+    if (this.stats) this.stats.begin();
     const t = time * 0.001;
     const mixValue = 0.5 + 0.5 * Math.sin(t * 0.5);
-    sceneManager.setMix(mixValue);
-    sceneManager.render(time);
-    if (stats) stats.end();
-  });
+    this.sceneManager.setMix(mixValue);
+    this.sceneManager.render(time);
+    if (this.stats) this.stats.end();
+  }
 }
 
-main();
+new App().init();

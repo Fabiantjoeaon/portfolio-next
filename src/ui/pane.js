@@ -3,6 +3,8 @@ import { getFlag } from "../lib/query.js";
 
 const debug = getFlag("debug");
 let pane = null;
+
+// TODO: Ensure that only called once??
 if (debug) {
   pane = new Pane({
     title: "Controls",

@@ -1,9 +1,8 @@
-import * as THREE from "three/webgpu";
+import { mrt, normalView, output } from "three/tsl";
+import { PostProcessingScene } from "./../three/postScene.js";
 import { createGBuffer, resizeGBuffer } from "./gbuffer.js";
 import { createGBufferMaterial } from "./materials/GBufferMaterial.js";
 import { PostProcessingMaterial } from "./materials/PostMaterial.js";
-import { PostProcessingScene } from "./../three/postScene.js";
-import { mrt, output, normalView } from "three/tsl";
 
 let _nextSceneId = 1;
 
@@ -70,6 +69,7 @@ export class SceneManager {
     return id;
   }
 
+  // TODO: call after switch
   setActivePair(prevId, nextId) {
     this.activePrevId = prevId ?? this.activePrevId;
     this.activeNextId = nextId ?? this.activeNextId;
@@ -91,6 +91,9 @@ export class SceneManager {
         devicePixelRatio
       );
       entry.gbuffer = resized;
+
+      entry.camera.aspect = width / height;
+      entry.camera.updateProjectionMatrix();
     }
   }
 
