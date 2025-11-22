@@ -27,10 +27,11 @@ export class PostProcessingMaterial {
   }
 
   rebuildGraph() {
-    // Default to black
-    // let colorNode = vec3(0.0, 0.0, 0.0);
-
     if (this.prevTex && this.nextTex && this.transition) {
+      console.log(
+        `rebuildGraph: using prevTex.id=${this.prevTex.id}, nextTex.id=${this.nextTex.id}`
+      );
+
       this.material.colorNode = this.transition.buildColorNode({
         uvNode: uv(),
         mixNode: this.mixNode,
@@ -41,33 +42,37 @@ export class PostProcessingMaterial {
         nextNormal: this.nextNormal,
         nextDepth: this.nextDepth,
       });
+
+      // Force material to recognize the change
+      this.material.needsUpdate = true;
     }
-    //   if (node) colorNode = node;
-    // else {
-    //   console.log("FALLBACK");
-    //   // Fallback: Show prev, or next, or black
-    //   const tex = this.prevTex || this.nextTex;
-    //   if (tex) {
-    //     const sample = texture(tex, uv());
-    //     colorNode = sample.rgb;
-    //   }
-    // }
   }
 
   setInputs(inputs) {
     const { prev, next, prevNormal, prevDepth, nextNormal, nextDepth } = inputs;
     let graphDirty = false;
 
-    // if (prev) console.log(prev.id);
+    console.log(
+      `setInputs: prev.id=${prev?.id}, next.id=${next?.id}, this.prevTex.id=${this.prevTex?.id}, this.nextTex.id=${this.nextTex?.id}, needsRebuild=${this._needsRebuild}`
+    );
 
-    // Update textures and check for changes
-    if (prev && prev !== this.prevTex) {
+    // ALWAYS update textures, even if they're the same objects
+    // This ensures WebGPU recognizes the change
+    if (prev) {
+      const changed = prev !== this.prevTex;
       this.prevTex = prev;
-      graphDirty = true;
+      if (changed) {
+        graphDirty = true;
+        console.log(`  -> prevTex changed to ${prev.id}`);
+      }
     }
-    if (next && next !== this.nextTex) {
+    if (next) {
+      const changed = next !== this.nextTex;
       this.nextTex = next;
-      graphDirty = true;
+      if (changed) {
+        graphDirty = true;
+        console.log(`  -> nextTex changed to ${next.id}`);
+      }
     }
 
     // Update optional attachments (sticky: keep existing if undefined)
@@ -76,8 +81,17 @@ export class PostProcessingMaterial {
     if (nextNormal !== undefined) this.nextNormal = nextNormal;
     if (nextDepth !== undefined) this.nextDepth = nextDepth;
 
-    if (graphDirty) {
+    // ALWAYS rebuild if we have valid textures and a transition
+    // This ensures the shader always uses the latest texture assignments
+    if (this.prevTex && this.nextTex && this.transition) {
+      console.log(
+        `  -> REBUILDING GRAPH (graphDirty=${graphDirty}, needsRebuild=${this._needsRebuild})`
+      );
       this.rebuildGraph();
+      this._needsRebuild = false;
+    } else if (this._needsRebuild) {
+      // Handle the case where transition changed but textures aren't ready yet
+      this._needsRebuild = false;
     }
   }
 
@@ -86,7 +100,11 @@ export class PostProcessingMaterial {
   }
 
   setTransition(transition) {
+    const changed = transition !== this.transition;
     this.transition = transition ?? null;
-    this.rebuildGraph();
+    // Mark that we need to rebuild on next setInputs call
+    if (changed) {
+      this._needsRebuild = true;
+    }
   }
 }

@@ -40,19 +40,27 @@ export class TransitionManager {
   }
 
   onTransitionComplete() {
-    // Finalize switch: next becomes prev; advance next
+    // The scene we just transitioned TO (at nextIdx) becomes the new prevIdx
     this.prevIdx = this.nextIdx;
-    this.nextIdx = (this.nextIdx + 1) % this.sceneIds.length;
+    // Calculate what the next scene will be (for the upcoming transition)
+    this.nextIdx = (this.prevIdx + 1) % this.sceneIds.length;
 
+    console.log(
+      `onTransitionComplete: prevIdx=${this.prevIdx} (scene ${
+        this.sceneIds[this.prevIdx]
+      }), nextIdx=${this.nextIdx} (scene ${this.sceneIds[this.nextIdx]})`
+    );
+
+    // Update the active pair to reflect the new prev/next
     this.sceneManager.setActivePair(
       this.sceneIds[this.prevIdx],
       this.sceneIds[this.nextIdx]
     );
-    // Back to idle phase with new pair; show prev fully (mix=0)
 
-    // FIXME: When removing this it stays on the next scene
-    // but then it doesnt transition properly
-    // Somewhere here lies the root cause that scene transitions are not working properly
+    // DON'T apply the next transition yet - textures haven't been updated!
+    // We'll apply it when starting the next transition
+
+    // Reset mix to 0 to display prev (the scene we just transitioned to)
     this.sceneManager.setMix(0);
     this.phase = "idle";
   }
@@ -61,15 +69,20 @@ export class TransitionManager {
     if (!this.sceneIds.length) return;
 
     const elapsed = nowMs - this.t0;
+
     if (this.phase === "idle") {
-      // Hold current scene (prev) fully visible
-      //this.sceneManager.setMix(0);
+      // Hold current scene (prev) fully visible at mix=0
       if (elapsed >= this.idleMs) {
-        // Start transition to next scene
+        console.log(
+          `Starting transition: prevIdx=${this.prevIdx} (scene ${
+            this.sceneIds[this.prevIdx]
+          }) -> nextIdx=${this.nextIdx} (scene ${this.sceneIds[this.nextIdx]})`
+        );
+        // Start transition - apply the transition NOW after textures have been rendered
+        // This will mark the shader for rebuild on next render
+        this._applyNextTransition();
         this.phase = "transition";
         this.t0 = nowMs;
-        // Ensure correct transition is applied for upcoming scene
-        this._applyNextTransition();
       }
     } else {
       // Transition phase: 0 -> 1 over transitionMs

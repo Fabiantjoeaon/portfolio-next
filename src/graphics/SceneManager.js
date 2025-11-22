@@ -118,7 +118,6 @@ export class SceneManager {
     }
 
     // Update post material inputs
-    // FIXME: Should update when 'transition'
     if (prev || next) {
       const pTex = prev?.gbuffer.albedo ?? next?.gbuffer.albedo;
       const nTex = next?.gbuffer.albedo ?? prev?.gbuffer.albedo;
