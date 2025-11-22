@@ -1,10 +1,12 @@
 import * as THREE from "three/webgpu";
 import { BaseScene } from "./BaseScene.js";
+import { FadeTransition } from "../graphics/transitions/FadeTransition.js";
 
 export class RotatingCubeScene extends BaseScene {
   constructor(controls) {
     super();
     this.scene.background = new THREE.Color(0x0b0e12);
+    this.transition = new FadeTransition();
 
     const { innerWidth, innerHeight } = window;
 

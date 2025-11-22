@@ -1,10 +1,12 @@
 import * as THREE from "three/webgpu";
 import { BaseScene } from "./BaseScene.js";
+import { SwipeTransition } from "../graphics/transitions/SwipeTransition.js";
 
 export class TestScene extends BaseScene {
   constructor(controls) {
     super();
     this.scene.background = new THREE.Color(0x0b0e12);
+    this.transition = new SwipeTransition();
 
     const { innerWidth, innerHeight } = window;
     this.camera = new THREE.PerspectiveCamera(

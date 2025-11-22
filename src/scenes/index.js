@@ -9,20 +9,15 @@ import { FadeTransition } from "../graphics/transitions/FadeTransition.js";
 export const orderedScenes = [
   {
     Scene: SpheresScene,
-    transition: SwipeTransition,
   },
   {
     Scene: RotatingCubeScene,
-    transition: FadeTransition,
   },
   {
     Scene: TestScene,
-
-    transition: SwipeTransition,
   },
 ];
 
-// TODO: Just move this.transition to scene class
 export function createScenes(configs = []) {
   return orderedScenes.map((entry, idx) => {
     const SceneClass = entry?.Scene ?? entry; // support class-only entries
@@ -31,8 +26,6 @@ export function createScenes(configs = []) {
     const cfg = { ...defaultCfg, ...overrideCfg };
     const instance = new SceneClass(cfg);
 
-    const TransitionClass = entry?.transition ?? SwipeTransition;
-    instance.transition = new TransitionClass(entry?.transitionConfig ?? {});
     return instance;
   });
 }
