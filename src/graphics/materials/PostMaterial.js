@@ -28,10 +28,6 @@ export class PostProcessingMaterial {
 
   rebuildGraph() {
     if (this.prevTex && this.nextTex && this.transition) {
-      console.log(
-        `rebuildGraph: using prevTex.id=${this.prevTex.id}, nextTex.id=${this.nextTex.id}`
-      );
-
       this.material.colorNode = this.transition.buildColorNode({
         uvNode: uv(),
         mixNode: this.mixNode,
@@ -43,7 +39,7 @@ export class PostProcessingMaterial {
         nextDepth: this.nextDepth,
       });
 
-      // Force material to recognize the change
+      // Force material to recognize the shader node change
       this.material.needsUpdate = true;
     }
   }
@@ -52,27 +48,14 @@ export class PostProcessingMaterial {
     const { prev, next, prevNormal, prevDepth, nextNormal, nextDepth } = inputs;
     let graphDirty = false;
 
-    console.log(
-      `setInputs: prev.id=${prev?.id}, next.id=${next?.id}, this.prevTex.id=${this.prevTex?.id}, this.nextTex.id=${this.nextTex?.id}, needsRebuild=${this._needsRebuild}`
-    );
-
-    // ALWAYS update textures, even if they're the same objects
-    // This ensures WebGPU recognizes the change
-    if (prev) {
-      const changed = prev !== this.prevTex;
+    // Update textures and check for changes
+    if (prev && prev !== this.prevTex) {
       this.prevTex = prev;
-      if (changed) {
-        graphDirty = true;
-        console.log(`  -> prevTex changed to ${prev.id}`);
-      }
+      graphDirty = true;
     }
-    if (next) {
-      const changed = next !== this.nextTex;
+    if (next && next !== this.nextTex) {
       this.nextTex = next;
-      if (changed) {
-        graphDirty = true;
-        console.log(`  -> nextTex changed to ${next.id}`);
-      }
+      graphDirty = true;
     }
 
     // Update optional attachments (sticky: keep existing if undefined)
@@ -81,16 +64,9 @@ export class PostProcessingMaterial {
     if (nextNormal !== undefined) this.nextNormal = nextNormal;
     if (nextDepth !== undefined) this.nextDepth = nextDepth;
 
-    // ALWAYS rebuild if we have valid textures and a transition
-    // This ensures the shader always uses the latest texture assignments
-    if (this.prevTex && this.nextTex && this.transition) {
-      console.log(
-        `  -> REBUILDING GRAPH (graphDirty=${graphDirty}, needsRebuild=${this._needsRebuild})`
-      );
+    // Rebuild only when textures change OR when transition was updated
+    if (graphDirty || this._needsRebuild) {
       this.rebuildGraph();
-      this._needsRebuild = false;
-    } else if (this._needsRebuild) {
-      // Handle the case where transition changed but textures aren't ready yet
       this._needsRebuild = false;
     }
   }

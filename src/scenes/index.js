@@ -15,11 +15,11 @@ export const orderedScenes = [
     Scene: RotatingCubeScene,
     transition: FadeTransition,
   },
-  //   {
-  //     Scene: TestScene,
+  {
+    Scene: TestScene,
 
-  //     transition: FadeTransition,
-  //   },
+    transition: SwipeTransition,
+  },
 ];
 
 // TODO: Just move this.transition to scene class

@@ -45,12 +45,6 @@ export class TransitionManager {
     // Calculate what the next scene will be (for the upcoming transition)
     this.nextIdx = (this.prevIdx + 1) % this.sceneIds.length;
 
-    console.log(
-      `onTransitionComplete: prevIdx=${this.prevIdx} (scene ${
-        this.sceneIds[this.prevIdx]
-      }), nextIdx=${this.nextIdx} (scene ${this.sceneIds[this.nextIdx]})`
-    );
-
     // Update the active pair to reflect the new prev/next
     this.sceneManager.setActivePair(
       this.sceneIds[this.prevIdx],
@@ -73,11 +67,6 @@ export class TransitionManager {
     if (this.phase === "idle") {
       // Hold current scene (prev) fully visible at mix=0
       if (elapsed >= this.idleMs) {
-        console.log(
-          `Starting transition: prevIdx=${this.prevIdx} (scene ${
-            this.sceneIds[this.prevIdx]
-          }) -> nextIdx=${this.nextIdx} (scene ${this.sceneIds[this.nextIdx]})`
-        );
         // Start transition - apply the transition NOW after textures have been rendered
         // This will mark the shader for rebuild on next render
         this._applyNextTransition();

@@ -15,7 +15,7 @@ export class SwipeTransition extends BaseTransition {
   constructor(config = {}) {
     super(config);
     this._feather = uniform(
-      typeof config.feather === "number" ? config.feather : 0.02
+      typeof config.feather === "number" ? config.feather : 0.0
     );
   }
 

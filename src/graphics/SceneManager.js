@@ -45,7 +45,6 @@ export class SceneManager {
     return id;
   }
 
-  // TODO: call after switch
   setActivePair(prevId, nextId) {
     this.activePrevId = prevId;
     this.activeNextId = nextId;
@@ -79,13 +78,10 @@ export class SceneManager {
     const next = this.scenes.get(this.activeNextId);
 
     if (prev?.update) prev.update(timeMs);
-    // Only update next scene if set
+    // Only update next scene if it's different from prev
     if (next?.update && next !== prev) next.update(timeMs);
 
-    // FIXME: These are all triggered
-
-    // Prev scene GBuffer
-    // FIXME: Should render when 'idle' or 'transition'
+    // Render prev scene to its GBuffer
     if (prev) {
       renderer.setRenderTarget(prev.gbuffer.target);
       renderer.setMRT(
@@ -100,10 +96,8 @@ export class SceneManager {
       renderer.setMRT(null);
     }
 
-    // Next scene GBuffer
-    // FIXME: Should render when 'transition'
+    // Render next scene to its GBuffer
     if (next) {
-      // console.log("rendering next scene");
       renderer.setRenderTarget(next.gbuffer.target);
       renderer.setMRT(
         mrt({
