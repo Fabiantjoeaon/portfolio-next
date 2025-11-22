@@ -1,38 +1,10 @@
-import { mrt, normalView, output } from "three/tsl";
+import { mrt, output, vec3 } from "three/tsl";
 import { PostProcessingScene } from "./../three/postScene.js";
 import { createGBuffer, resizeGBuffer } from "./gbuffer.js";
 import { createGBufferMaterial } from "./materials/GBufferMaterial.js";
 import { PostProcessingMaterial } from "./materials/PostMaterial.js";
 
 let _nextSceneId = 1;
-
-function hideObjectsWithoutNormals(root) {
-  const modified = [];
-  root.traverse((obj) => {
-    if (obj.isMesh) {
-      const geom = obj.geometry;
-      const hasNormals = !!geom?.attributes?.normal;
-      if (!hasNormals && obj.visible !== false) {
-        modified.push({ obj, prevVisible: obj.visible });
-        obj.visible = false;
-      }
-    } else if (!obj.isScene) {
-      // Hide only line-like helpers and point-based objects; keep groups/empty containers visible
-      const shouldHide =
-        obj.isLine === true ||
-        obj.isLineSegments === true ||
-        obj.isPoints === true ||
-        obj.isSprite === true;
-      if (shouldHide && obj.visible !== false) {
-        modified.push({ obj, prevVisible: obj.visible });
-        obj.visible = false;
-      }
-    }
-  });
-  return () => {
-    for (const m of modified) m.obj.visible = m.prevVisible;
-  };
-}
 
 export class SceneManager {
   constructor(renderer) {
@@ -116,14 +88,12 @@ export class SceneManager {
       renderer.setMRT(
         mrt({
           output,
-          normal: normalView,
+          normal: vec3(0),
         })
       );
-      const restorePrevVisibility = hideObjectsWithoutNormals(prev.scene);
       prev.scene.overrideMaterial = prev.gbufferMat;
       renderer.render(prev.scene, prev.camera);
       prev.scene.overrideMaterial = null;
-      restorePrevVisibility();
       renderer.setMRT(null);
     }
 
@@ -133,14 +103,12 @@ export class SceneManager {
       renderer.setMRT(
         mrt({
           output,
-          normal: normalView,
+          normal: vec3(0),
         })
       );
-      const restoreNextVisibility = hideObjectsWithoutNormals(next.scene);
       next.scene.overrideMaterial = next.gbufferMat;
       renderer.render(next.scene, next.camera);
       next.scene.overrideMaterial = null;
-      restoreNextVisibility();
       renderer.setMRT(null);
     }
 
@@ -152,9 +120,7 @@ export class SceneManager {
       this.post.material.setInputs({
         prev: pTex,
         next: nTex,
-        prevNormal: prev?.gbuffer.normals,
         prevDepth: prev?.gbuffer.depth,
-        nextNormal: next?.gbuffer.normals,
         nextDepth: next?.gbuffer.depth,
       });
     }
