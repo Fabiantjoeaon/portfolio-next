@@ -9,12 +9,10 @@ import { FadeTransition } from "../graphics/transitions/FadeTransition.js";
 export const orderedScenes = [
   {
     Scene: SpheresScene,
-
     transition: SwipeTransition,
   },
   {
     Scene: RotatingCubeScene,
-
     transition: FadeTransition,
   },
   //   {

@@ -47,8 +47,8 @@ export class SceneManager {
 
   // TODO: call after switch
   setActivePair(prevId, nextId) {
-    this.activePrevId = prevId ?? this.activePrevId;
-    this.activeNextId = nextId ?? this.activeNextId;
+    this.activePrevId = prevId;
+    this.activeNextId = nextId;
   }
 
   setMix(value) {
@@ -82,7 +82,10 @@ export class SceneManager {
     // Only update next scene if set
     if (next?.update && next !== prev) next.update(timeMs);
 
+    // FIXME: These are all triggered
+
     // Prev scene GBuffer
+    // FIXME: Should render when 'idle' or 'transition'
     if (prev) {
       renderer.setRenderTarget(prev.gbuffer.target);
       renderer.setMRT(
@@ -98,7 +101,9 @@ export class SceneManager {
     }
 
     // Next scene GBuffer
+    // FIXME: Should render when 'transition'
     if (next) {
+      // console.log("rendering next scene");
       renderer.setRenderTarget(next.gbuffer.target);
       renderer.setMRT(
         mrt({
@@ -113,6 +118,7 @@ export class SceneManager {
     }
 
     // Update post material inputs
+    // FIXME: Should update when 'transition'
     if (prev || next) {
       const pTex = prev?.gbuffer.albedo ?? next?.gbuffer.albedo;
       const nTex = next?.gbuffer.albedo ?? prev?.gbuffer.albedo;
