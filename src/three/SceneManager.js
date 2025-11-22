@@ -144,25 +144,18 @@ export class SceneManager {
       renderer.setMRT(null);
     }
 
-    // Both active
-    if (prev && next) {
+    // Update post material inputs
+    if (prev || next) {
+      const pTex = prev?.gbuffer.albedo ?? next?.gbuffer.albedo;
+      const nTex = next?.gbuffer.albedo ?? prev?.gbuffer.albedo;
+
       this.post.material.setInputs({
-        prev: prev.gbuffer.albedo,
-        prevNormal: prev.gbuffer.normals,
-        prevDepth: prev.gbuffer.depth,
-        next: next.gbuffer.albedo,
-        nextNormal: next.gbuffer.normals,
-        nextDepth: next.gbuffer.depth,
-      });
-    } else if (prev) {
-      this.post.material.setInputs({
-        prev: prev.gbuffer.albedo,
-        next: prev.gbuffer.albedo,
-      });
-    } else if (next) {
-      this.post.material.setInputs({
-        prev: next.gbuffer.albedo,
-        next: next.gbuffer.albedo,
+        prev: pTex,
+        next: nTex,
+        prevNormal: prev?.gbuffer.normals,
+        prevDepth: prev?.gbuffer.depth,
+        nextNormal: next?.gbuffer.normals,
+        nextDepth: next?.gbuffer.depth,
       });
     }
 
