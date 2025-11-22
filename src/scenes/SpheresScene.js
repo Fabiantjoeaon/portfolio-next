@@ -8,13 +8,6 @@ export class SpheresScene extends BaseScene {
     this.scene.background = new THREE.Color(0x0b0e12);
     this.transition = new SwipeTransition();
 
-    const { innerWidth, innerHeight } = window;
-    this.camera = new THREE.PerspectiveCamera(
-      60,
-      innerWidth / innerHeight,
-      0.1,
-      1000
-    );
     this.camera.position.set(4, 3, 7);
     this.camera.lookAt(0, 0, 0);
 
@@ -51,6 +44,7 @@ export class SpheresScene extends BaseScene {
   }
 
   update(elapsedMs) {
+    super.update();
     const t = elapsedMs * 0.001;
     this.group.rotation.x = t * this.rotateX;
     this.group.rotation.y = t * this.rotateY;

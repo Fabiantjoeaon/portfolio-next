@@ -8,13 +8,6 @@ export class TestScene extends BaseScene {
     this.scene.background = new THREE.Color(0x0b0e12);
     this.transition = new SwipeTransition();
 
-    const { innerWidth, innerHeight } = window;
-    this.camera = new THREE.PerspectiveCamera(
-      60,
-      innerWidth / innerHeight,
-      0.1,
-      1000
-    );
     this.camera.position.set(3, 2, 5);
     this.camera.lookAt(0, 0, 0);
 
@@ -46,6 +39,7 @@ export class TestScene extends BaseScene {
   }
 
   update(elapsedMs) {
+    super.update();
     const t = elapsedMs * 0.001;
     this.cube.rotation.x = t * this.rotateX;
     this.cube.rotation.y = t * this.rotateY;
