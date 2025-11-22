@@ -61,12 +61,7 @@ export class TransitionManager {
         // Finalize switch: next becomes prev; advance next
         this.prevIdx = this.nextIdx;
         this.nextIdx = (this.nextIdx + 1) % this.sceneIds.length;
-        console.log(
-          "[TransitionManager] Next index:",
-          this.nextIdx,
-          "Prev index:",
-          this.prevIdx
-        );
+
         this.sceneManager.setActivePair(
           this.sceneIds[this.prevIdx],
           this.sceneIds[this.nextIdx]

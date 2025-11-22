@@ -1,4 +1,4 @@
-import { texture, uv, mix, uniform, vec3 } from "three/tsl";
+import { texture, uv, uniform, vec3 } from "three/tsl";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 
 /**
@@ -13,57 +13,70 @@ export class PostProcessingMaterial {
     // Uniform mix factor (0..1)
     this.mixNode = uniform(0.0);
 
-    // Placeholders; will be set via setters
+    // Inputs
     this.prevTex = null;
     this.nextTex = null;
-    this.lastPrev = null;
-    this.lastNext = null;
+    this.prevNormal = null;
+    this.prevDepth = null;
+    this.nextNormal = null;
+    this.nextDepth = null;
+
     this.transition = null;
 
     this.rebuildGraph();
   }
 
   rebuildGraph() {
+    // Default to black
+    // let colorNode = vec3(0.0, 0.0, 0.0);
+
     if (this.prevTex && this.nextTex && this.transition) {
-      const colorNode = this.transition.buildColorNode({
-        prevTex: this.prevTex,
-        nextTex: this.nextTex,
+      this.material.colorNode = this.transition.buildColorNode({
         uvNode: uv(),
         mixNode: this.mixNode,
+        prevTex: this.prevTex,
         prevNormal: this.prevNormal,
         prevDepth: this.prevDepth,
+        nextTex: this.nextTex,
         nextNormal: this.nextNormal,
         nextDepth: this.nextDepth,
       });
-      this.material.colorNode = colorNode ?? vec3(0.0, 0.0, 0.0);
-    } else if (this.prevTex) {
-      const prevSample = texture(this.prevTex, uv());
-      this.material.colorNode = prevSample.rgb;
-    } else if (this.nextTex) {
-      const nextSample = texture(this.nextTex, uv());
-      this.material.colorNode = nextSample.rgb;
-    } else {
-      this.material.colorNode = vec3(0.0, 0.0, 0.0);
     }
+    //   if (node) colorNode = node;
+    // else {
+    //   console.log("FALLBACK");
+    //   // Fallback: Show prev, or next, or black
+    //   const tex = this.prevTex || this.nextTex;
+    //   if (tex) {
+    //     const sample = texture(tex, uv());
+    //     colorNode = sample.rgb;
+    //   }
+    // }
   }
 
   setInputs(inputs) {
-    // Required
-    const newPrev = inputs.prev || this.prevTex;
-    const newNext = inputs.next || this.nextTex;
-    const changed = newPrev !== this.lastPrev || newNext !== this.lastNext;
-    this.prevTex = newPrev;
-    this.nextTex = newNext;
+    const { prev, next, prevNormal, prevDepth, nextNormal, nextDepth } = inputs;
+    let graphDirty = false;
 
-    // Optional GBuffer attachments
-    this.prevNormal = inputs.prevNormal ?? this.prevNormal ?? null;
-    this.prevDepth = inputs.prevDepth ?? this.prevDepth ?? null;
-    this.nextNormal = inputs.nextNormal ?? this.nextNormal ?? null;
-    this.nextDepth = inputs.nextDepth ?? this.nextDepth ?? null;
+    // if (prev) console.log(prev.id);
 
-    if (changed) {
-      this.lastPrev = this.prevTex;
-      this.lastNext = this.nextTex;
+    // Update textures and check for changes
+    if (prev && prev !== this.prevTex) {
+      this.prevTex = prev;
+      graphDirty = true;
+    }
+    if (next && next !== this.nextTex) {
+      this.nextTex = next;
+      graphDirty = true;
+    }
+
+    // Update optional attachments (sticky: keep existing if undefined)
+    if (prevNormal !== undefined) this.prevNormal = prevNormal;
+    if (prevDepth !== undefined) this.prevDepth = prevDepth;
+    if (nextNormal !== undefined) this.nextNormal = nextNormal;
+    if (nextDepth !== undefined) this.nextDepth = nextDepth;
+
+    if (graphDirty) {
       this.rebuildGraph();
     }
   }

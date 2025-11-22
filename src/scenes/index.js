@@ -32,6 +32,7 @@ export function createScenes(configs = []) {
     const overrideCfg = configs[idx] ?? {};
     const cfg = { ...defaultCfg, ...overrideCfg };
     const instance = new SceneClass(cfg);
+
     const TransitionClass = entry?.transition ?? SwipeTransition;
     instance.transition = new TransitionClass(entry?.transitionConfig ?? {});
     return instance;

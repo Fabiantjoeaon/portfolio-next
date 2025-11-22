@@ -1,5 +1,15 @@
 import { BaseTransition } from "./BaseTransition.js";
-import { texture, uv, smoothstep, sub, add, mul, clamp, mix, uniform } from "three/tsl";
+import {
+  texture,
+  uv,
+  smoothstep,
+  sub,
+  add,
+  mul,
+  clamp,
+  mix,
+  uniform,
+} from "three/tsl";
 
 export class SwipeTransition extends BaseTransition {
   constructor(config = {}) {
@@ -22,5 +32,3 @@ export class SwipeTransition extends BaseTransition {
     return mix(prevSample.rgb, nextSample.rgb, swipe);
   }
 }
-
-
