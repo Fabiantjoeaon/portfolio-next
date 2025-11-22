@@ -12,8 +12,6 @@ export class PostProcessingMaterial {
 
     // Uniform mix factor (0..1)
     this.mixNode = uniform(0.0);
-    // Deprecated: transitions should manage their own params; kept for backward compat (unused by default)
-    this.featherNode = uniform(0.02);
 
     // Placeholders; will be set via setters
     this.prevTex = null;
@@ -72,10 +70,6 @@ export class PostProcessingMaterial {
 
   setMix(value) {
     this.mixNode.value = value;
-  }
-
-  setFeather(value) {
-    this.featherNode.value = value;
   }
 
   setTransition(transition) {
