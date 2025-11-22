@@ -1,8 +1,8 @@
 import { bus } from "./events/bus.js";
 import { useViewportStore } from "./state/store.js";
 import { WebGPURenderer } from "three/webgpu";
-import { SceneManager } from "./gl/SceneManager.js";
-import { TransitionManager } from "./gl/TransitionManager.js";
+import { SceneManager } from "./graphics/SceneManager.js";
+import { TransitionManager } from "./graphics/TransitionManager.js";
 import { getFlag } from "./lib/query.js";
 import Stats from "stats.js";
 import { orderedScenes, createScenes } from "./scenes/index.js";
