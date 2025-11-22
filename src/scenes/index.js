@@ -15,7 +15,7 @@ export const orderedScenes = [
   {
     Scene: RotatingCubeScene,
 
-    transition: SwipeTransition,
+    transition: FadeTransition,
   },
   //   {
   //     Scene: TestScene,
@@ -24,7 +24,7 @@ export const orderedScenes = [
   //   },
 ];
 
-// Utility to instantiate scenes; external configs override defaults by index
+// TODO: Just move this.transition to scene class
 export function createScenes(configs = []) {
   return orderedScenes.map((entry, idx) => {
     const SceneClass = entry?.Scene ?? entry; // support class-only entries

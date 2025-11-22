@@ -1,7 +1,14 @@
 - Find way to have an object consistent across scenes
 
+- Lighting
+    - Post pro set-up with PBR>MRO textures?
+    - Custom set-up with MRO textures?
+    - Regular three lighting?
+
 - Offscreen rendering?
     - https://claude.ai/chat/f4145cd5-a15b-4ee7-9c62-de5fb3b9cccf
+    - https://github.com/pmndrs/react-three-offscreen/blob/main/src/render.ts
+    
 
 
 - Port over grid

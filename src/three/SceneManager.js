@@ -50,9 +50,7 @@ export class SceneManager {
     this.activeNextId = null;
     this.mixValue = 0.0;
 
-    // Post pipeline
-    this.post = new PostProcessingMaterial();
-    this.postScene = new PostProcessingScene(this.post.material);
+    this.post = new PostProcessingScene();
   }
 
   addScene(sceneObj) {
@@ -83,7 +81,7 @@ export class SceneManager {
 
   setMix(value) {
     this.mixValue = Math.min(Math.max(value, 0), 1);
-    this.post.setMix(this.mixValue);
+    this.post.material.setMix(this.mixValue);
   }
 
   resize({ width, height, devicePixelRatio }) {
@@ -148,7 +146,7 @@ export class SceneManager {
 
     // Both active
     if (prev && next) {
-      this.post.setInputs({
+      this.post.material.setInputs({
         prev: prev.gbuffer.albedo,
         prevNormal: prev.gbuffer.normals,
         prevDepth: prev.gbuffer.depth,
@@ -157,18 +155,18 @@ export class SceneManager {
         nextDepth: next.gbuffer.depth,
       });
     } else if (prev) {
-      this.post.setInputs({
+      this.post.material.setInputs({
         prev: prev.gbuffer.albedo,
         next: prev.gbuffer.albedo,
       });
     } else if (next) {
-      this.post.setInputs({
+      this.post.material.setInputs({
         prev: next.gbuffer.albedo,
         next: next.gbuffer.albedo,
       });
     }
 
     renderer.setRenderTarget(null);
-    renderer.render(this.postScene.scene, this.postScene.camera);
+    renderer.render(this.post.scene, this.post.camera);
   }
 }

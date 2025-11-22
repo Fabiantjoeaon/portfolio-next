@@ -1,18 +1,14 @@
 export class TransitionManager {
-  constructor(
-    sceneManager,
-    { waitMs = 1000, transitionMs = 500, durationMs } = {}
-  ) {
+  constructor(sceneManager, { idleMs = 1000, transitionMs = 500 } = {}) {
     this.sceneManager = sceneManager;
-    // Back-compat: if durationMs provided, treat as waitMs
-    this.waitMs = typeof durationMs === "number" ? durationMs : waitMs;
+    this.idleMs = idleMs;
     this.transitionMs = transitionMs;
     this.sceneIds = [];
     this.sceneInstances = [];
     this.prevIdx = 0;
     this.nextIdx = 0;
     this.t0 = 0;
-    this.phase = "wait"; // 'wait' | 'transition'
+    this.phase = "idle";
   }
 
   setSequence(sceneIds, sceneInstances) {
@@ -28,28 +24,28 @@ export class TransitionManager {
       this.sceneIds[this.prevIdx],
       this.sceneIds[this.nextIdx]
     );
-    // Begin in wait phase showing prev fully (mix = 0)
+    // Begin in idle phase showing prev fully (mix = 0)
     this._applyNextTransition();
     this.sceneManager.setMix(0);
-    this.phase = "wait";
+    this.phase = "idle";
     this.t0 = nowMs ?? performance.now();
   }
 
   _applyNextTransition() {
     const nextInst = this.sceneInstances[this.nextIdx];
     const transition = nextInst?.transition ?? null;
-    if (transition && this.sceneManager?.post?.setTransition) {
-      this.sceneManager.post.setTransition(transition);
+    if (transition && this.sceneManager?.post?.material?.setTransition) {
+      this.sceneManager.post.material.setTransition(transition);
     }
   }
 
   update(nowMs) {
     if (!this.sceneIds.length) return;
     const elapsed = nowMs - this.t0;
-    if (this.phase === "wait") {
+    if (this.phase === "idle") {
       // Hold current scene (prev) fully visible
       this.sceneManager.setMix(0);
-      if (elapsed >= this.waitMs) {
+      if (elapsed >= this.idleMs) {
         // Start transition to next scene
         this.phase = "transition";
         this.t0 = nowMs;
@@ -68,9 +64,9 @@ export class TransitionManager {
           this.sceneIds[this.prevIdx],
           this.sceneIds[this.nextIdx]
         );
-        // Back to wait phase with new pair; show prev fully (mix=0)
+        // Back to idle phase with new pair; show prev fully (mix=0)
         this.sceneManager.setMix(0);
-        this.phase = "wait";
+        this.phase = "idle";
         this.t0 = nowMs;
       }
     }
