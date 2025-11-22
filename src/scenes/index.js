@@ -1,8 +1,8 @@
 import { TestScene } from "./TestScene.js";
 import { RotatingCubeScene } from "./RotatingCubeScene.js";
 import { SpheresScene } from "./SpheresScene.js";
-import { SwipeTransition } from "../three/transitions/SwipeTransition.js";
-import { FadeTransition } from "../three/transitions/FadeTransition.js";
+import { SwipeTransition } from "../gl/transitions/SwipeTransition.js";
+import { FadeTransition } from "../gl/transitions/FadeTransition.js";
 
 // Ordered list of scene entries with default configs for visual distinction
 // You can add more scenes here; each entry may be a class or { Scene, config }

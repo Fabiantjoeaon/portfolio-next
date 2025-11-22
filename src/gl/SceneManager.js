@@ -1,5 +1,5 @@
 import { mrt, output, vec3 } from "three/tsl";
-import { PostProcessingScene } from "./../three/postScene.js";
+import { PostProcessingScene } from "./postScene.js";
 import { createGBuffer, resizeGBuffer } from "./gbuffer.js";
 import { createGBufferMaterial } from "./materials/GBufferMaterial.js";
 import { PostProcessingMaterial } from "./materials/PostMaterial.js";
