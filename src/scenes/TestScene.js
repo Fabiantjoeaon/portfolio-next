@@ -1,12 +1,24 @@
 import * as THREE from "three/webgpu";
 import { BaseScene } from "./BaseScene.js";
 import { SwipeTransition } from "../graphics/transitions/SwipeTransition.js";
+import { colorGrade } from "../graphics/postprocessing/index.js";
 
 export class TestScene extends BaseScene {
   constructor(controls) {
     super();
     this.scene.background = new THREE.Color(0x0b0e12);
     this.transition = new SwipeTransition();
+
+    // Example per-scene post chain:
+    // - Slight blue-ish grade
+    this.postprocessingChain = [
+      (color, context) =>
+        colorGrade(color, {
+          ...context,
+          tint: [0.85, 0.95, 1.2],
+          intensity: 0.25,
+        }),
+    ];
 
     this.camera.position.set(3, 2, 5);
     this.camera.lookAt(0, 0, 0);

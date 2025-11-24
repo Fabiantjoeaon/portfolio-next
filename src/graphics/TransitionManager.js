@@ -33,9 +33,18 @@ export class TransitionManager {
 
   _applyNextTransition() {
     const nextInst = this.sceneInstances[this.nextIdx];
-    const transition = nextInst?.transition ?? null;
-    if (transition && this.sceneManager?.post?.material?.setTransition) {
-      this.sceneManager.post.material.setTransition(transition);
+    const transition = nextInst?.transition;
+    const postprocessingChain = nextInst?.postprocessingChain;
+
+    if (this.sceneManager.post.material) {
+      if (this.sceneManager.post.material.setTransition) {
+        this.sceneManager.post.material.setTransition(transition);
+      }
+      if (this.sceneManager.post.material.setpostprocessingChain) {
+        this.sceneManager.post.material.setpostprocessingChain(
+          postprocessingChain
+        );
+      }
     }
   }
 

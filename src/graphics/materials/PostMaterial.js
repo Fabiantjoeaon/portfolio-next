@@ -22,6 +22,7 @@ export class PostProcessingMaterial {
     this.nextDepth = null;
 
     this.transition = null;
+    this.postprocessingChain = null;
 
     this.rebuildGraph();
 
@@ -30,7 +31,7 @@ export class PostProcessingMaterial {
 
   rebuildGraph() {
     if (this.prevTex && this.nextTex && this.transition) {
-      this.material.colorNode = this.transition.buildColorNode({
+      let colorNode = this.transition.buildColorNode({
         uvNode: this.uvNode,
         mixNode: this.mixNode,
         prevTex: this.prevTex,
@@ -40,6 +41,32 @@ export class PostProcessingMaterial {
         nextNormal: this.nextNormal,
         nextDepth: this.nextDepth,
       });
+
+      // Apply optional postprocessing chain after the base transition blend.
+      if (
+        Array.isArray(this.postprocessingChain) &&
+        this.postprocessingChain.length > 0
+      ) {
+        const context = {
+          uvNode: this.uvNode,
+          mixNode: this.mixNode,
+          prevTex: this.prevTex,
+          prevNormal: this.prevNormal,
+          prevDepth: this.prevDepth,
+          nextTex: this.nextTex,
+          nextNormal: this.nextNormal,
+          nextDepth: this.nextDepth,
+        };
+
+        for (const fx of this.postprocessingChain) {
+          if (typeof fx === "function") {
+            const nextColor = fx(colorNode, context);
+            if (nextColor) colorNode = nextColor;
+          }
+        }
+      }
+
+      this.material.colorNode = colorNode;
 
       // Force material to recognize the shader node change
       this.material.needsUpdate = true;
@@ -81,6 +108,20 @@ export class PostProcessingMaterial {
     const changed = transition !== this.transition;
     this.transition = transition ?? null;
     // Mark that we need to rebuild on next setInputs call
+    if (changed) {
+      this._needsRebuild = true;
+    }
+  }
+
+  /**
+   * Set a chain of postprocessing functions to be applied after the transition blend.
+   * Each function receives (colorNode, context) and should return a new node.
+   * This is intended to be updated on scene/transition changes, not per-frame.
+   */
+  setpostprocessingChain(chain) {
+    const nextChain = Array.isArray(chain) ? chain : null;
+    const changed = nextChain !== this.postprocessingChain;
+    this.postprocessingChain = nextChain;
     if (changed) {
       this._needsRebuild = true;
     }

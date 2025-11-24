@@ -1,10 +1,21 @@
+// DOC: https://threejs.org/docs/#TSL
+
 - Render normals, worldposition
 
-- Diff post processing per scene
+- mouse movement
+
+- Post pro: abstract functionality
 
 - Grid w compute shader
 
 - Find way to have an object consistent across scenes
+
+- Post pro
+    - Volumetric lighting
+    - Bloom
+    - Data moshing
+    
+- MSDF text
 
 - Lighting
     - Post pro set-up with PBR>MRO textures?
@@ -21,3 +32,31 @@
     - Make screen adaptive + mobile version
 
 - Particle system
+
+
+
+POST PRO
+
+The performant way to disable is: don’t compile / don’t run the effect at all
+In your current architecture you already have the tools to do this:
+Per‑scene graph build:
+When a scene (or transition) changes, you call rebuildGraph() and build a different node graph:
+If the scene needs SSAO, build a graph (or pipeline) that includes SSAO.
+If it doesn’t, build a graph that simply never wires in that code.
+Result: the SSAO code is not in the compiled shader for that scene combo.
+Per‑scene / per‑pipeline passes:
+For truly heavy stuff, you can keep them as separate fullscreen passes:
+Scene A: renderScene → SSAO pass → colorGrading pass → transition pass
+Scene B: renderScene → colorGrading pass → transition pass
+You simply don’t call renderer.render for the SSAO mesh when the scene doesn’t use SSAO, so there’s zero AO cost.
+Practical rule of thumb
+Cheap / mid‑weight screen‑space effects (grade, vignette, basic distortion, simple outlines):
+Keep them in your single Option‑A fullscreen pass, and enable/disable by changing the graph on scene switch (so unused effects don’t even compile).
+Mega effects (multi‑tap DOF, SSAO, multi‑stage bloom, very dense sampling):
+Give them:
+Their own node material(s), and
+Their own fullscreen pass(es),
+and only:
+Create those materials once (on scene setup / transition setup, not per frame), and
+Render those passes only for scenes that use them.
+This way Option A is still your backbone (one main post pass), and your heavy screen‑space effects are completely absent—not just “if’d off”—for scenes that don’t need them.
