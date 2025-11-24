@@ -1,3 +1,9 @@
+- Render normals, worldposition
+
+- Diff post processing per scene
+
+- Grid w compute shader
+
 - Find way to have an object consistent across scenes
 
 - Lighting

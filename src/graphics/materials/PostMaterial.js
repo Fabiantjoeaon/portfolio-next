@@ -24,12 +24,14 @@ export class PostProcessingMaterial {
     this.transition = null;
 
     this.rebuildGraph();
+
+    this.uvNode = uv();
   }
 
   rebuildGraph() {
     if (this.prevTex && this.nextTex && this.transition) {
       this.material.colorNode = this.transition.buildColorNode({
-        uvNode: uv(),
+        uvNode: this.uvNode,
         mixNode: this.mixNode,
         prevTex: this.prevTex,
         prevNormal: this.prevNormal,

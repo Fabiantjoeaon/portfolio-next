@@ -90,9 +90,9 @@ export class SceneManager {
           normal: vec3(0),
         })
       );
-      prev.scene.overrideMaterial = prev.gbufferMat;
+      //prev.scene.overrideMaterial = prev.gbufferMat;
       renderer.render(prev.scene, prev.camera);
-      prev.scene.overrideMaterial = null;
+      //prev.scene.overrideMaterial = null;
       renderer.setMRT(null);
     }
 
@@ -105,9 +105,9 @@ export class SceneManager {
           normal: vec3(0),
         })
       );
-      next.scene.overrideMaterial = next.gbufferMat;
+      //next.scene.overrideMaterial = next.gbufferMat;
       renderer.render(next.scene, next.camera);
-      next.scene.overrideMaterial = null;
+      //next.scene.overrideMaterial = null;
       renderer.setMRT(null);
     }
 

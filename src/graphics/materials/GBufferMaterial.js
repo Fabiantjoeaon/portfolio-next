@@ -13,6 +13,7 @@ import { NodeMaterial } from "three/webgpu";
 export function createGBufferMaterial(albedoHex = 0xffffff) {
   const material = new NodeMaterial();
 
+  // TODO:
   const albedoNode = color(new THREE.Color(albedoHex));
   material.colorNode = albedoNode;
 

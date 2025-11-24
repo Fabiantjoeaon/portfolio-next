@@ -66,25 +66,6 @@ class App {
     this.transitionManager.start(performance.now());
   }
 
-  createOverlay() {
-    const el = document.createElement("div");
-    el.id = "debug-overlay";
-    el.style.position = "fixed";
-    el.style.top = "8px";
-    el.style.left = "8px";
-    el.style.zIndex = "9999";
-    el.style.pointerEvents = "none";
-    el.style.background = "rgba(15, 23, 42, 0.7)";
-    el.style.color = "#e2e8f0";
-    el.style.fontFamily =
-      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
-    el.style.fontSize = "12px";
-    el.style.padding = "6px 8px";
-    el.style.borderRadius = "6px";
-    document.body.appendChild(el);
-    this.overlayEl = el;
-  }
-
   onResize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -130,7 +111,6 @@ class App {
     }
 
     this.transitionManager?.update(time);
-
     this.sceneManager.render(time);
     if (this.stats) this.stats.end();
   }
