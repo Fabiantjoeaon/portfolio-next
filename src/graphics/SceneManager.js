@@ -21,6 +21,7 @@ export class SceneManager {
     this.activePrevId = null;
     this.activeNextId = null;
     this.mixValue = 0.0;
+    this.isTransitioning = false;
 
     this.post = new PostProcessingScene();
   }
@@ -55,6 +56,10 @@ export class SceneManager {
     this.post.material.setMix(this.mixValue);
   }
 
+  setTransitioning(isTransitioning) {
+    this.isTransitioning = isTransitioning;
+  }
+
   resize({ width, height, devicePixelRatio }) {
     this.viewport = { width, height, devicePixelRatio };
     // Recreate all gbuffers
@@ -77,11 +82,8 @@ export class SceneManager {
     const prev = this.scenes.get(this.activePrevId);
     const next = this.scenes.get(this.activeNextId);
 
+    // Always update and render the prev scene
     if (prev?.update) prev.update(timeMs);
-    // Only update next scene if it's different from prev
-    if (next?.update && next !== prev) next.update(timeMs);
-
-    // Render prev scene to its GBuffer
     if (prev) {
       renderer.setRenderTarget(prev.gbuffer.target);
       renderer.setMRT(
@@ -96,8 +98,10 @@ export class SceneManager {
       renderer.setMRT(null);
     }
 
-    // Render next scene to its GBuffer
-    if (next) {
+    // Only update and render next scene during transitions
+    if (this.isTransitioning && next && next !== prev) {
+      if (next.update) next.update(timeMs);
+
       renderer.setRenderTarget(next.gbuffer.target);
       renderer.setMRT(
         mrt({

@@ -65,6 +65,10 @@ export class TransitionManager {
 
     // Reset mix to 0 to display prev (the scene we just transitioned to)
     this.sceneManager.setMix(0);
+
+    // Notify SceneManager that we're no longer transitioning
+    this.sceneManager.setTransitioning(false);
+
     this.phase = "idle";
   }
 
@@ -79,6 +83,10 @@ export class TransitionManager {
         // Start transition - apply the transition NOW after textures have been rendered
         // This will mark the shader for rebuild on next render
         this._applyNextTransition();
+
+        // Notify SceneManager that we're starting a transition
+        this.sceneManager.setTransitioning(true);
+
         this.phase = "transition";
         this.t0 = nowMs;
       }

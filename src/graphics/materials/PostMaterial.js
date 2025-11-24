@@ -59,10 +59,8 @@ export class PostProcessingMaterial {
         };
 
         for (const fx of this.postprocessingChain) {
-          if (typeof fx === "function") {
-            const nextColor = fx(colorNode, context);
-            if (nextColor) colorNode = nextColor;
-          }
+          const nextColor = fx(colorNode, context);
+          if (nextColor) colorNode = nextColor;
         }
       }
 
