@@ -5,6 +5,7 @@
 - mouse movement
 
 - Post pro: abstract functionality
+    - Need to export world from depth 
 
 - Grid w compute shader
 
@@ -14,13 +15,14 @@
     - Volumetric lighting
     - Bloom
     - Data moshing
+        - https://ompuco.wordpress.com/2018/03/29/creating-your-own-datamosh-effect/
     
 - MSDF text
+    - https://webgpu.github.io/webgpu-samples/?sample=textRenderingMsdf
+    - https://github.com/leochocolat/three-msdf-text-utils?tab=readme-ov-file
 
 - Lighting
-    - Post pro set-up with PBR>MRO textures?
     - Custom set-up with MRO textures?
-    - Regular three lighting?
 
 - Offscreen rendering?
     - https://claude.ai/chat/f4145cd5-a15b-4ee7-9c62-de5fb3b9cccf

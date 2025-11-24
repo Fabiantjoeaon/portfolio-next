@@ -40,8 +40,8 @@ export class TransitionManager {
       if (this.sceneManager.post.material.setTransition) {
         this.sceneManager.post.material.setTransition(transition);
       }
-      if (this.sceneManager.post.material.setpostprocessingChain) {
-        this.sceneManager.post.material.setpostprocessingChain(
+      if (this.sceneManager.post.material.setPostprocessingChain) {
+        this.sceneManager.post.material.setPostprocessingChain(
           postprocessingChain
         );
       }

@@ -59,8 +59,7 @@ export class PostProcessingMaterial {
         };
 
         for (const fx of this.postprocessingChain) {
-          const nextColor = fx(colorNode, context);
-          if (nextColor) colorNode = nextColor;
+          colorNode = fx(colorNode, context);
         }
       }
 
@@ -116,7 +115,7 @@ export class PostProcessingMaterial {
    * Each function receives (colorNode, context) and should return a new node.
    * This is intended to be updated on scene/transition changes, not per-frame.
    */
-  setpostprocessingChain(chain) {
+  setPostprocessingChain(chain) {
     const nextChain = Array.isArray(chain) ? chain : null;
     const changed = nextChain !== this.postprocessingChain;
     this.postprocessingChain = nextChain;
