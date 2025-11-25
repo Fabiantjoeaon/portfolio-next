@@ -1,14 +1,9 @@
-import * as THREE from "three/webgpu";
-import {
-  createMSDFMaterial,
-  setMSDFColor,
-  setMSDFOpacity,
-  setMSDFPixelScale,
-} from "./materials/MSDFMaterial.js";
+import * as THREE from "three";
+import { createMSDFMaterial } from "./MSDFMaterial.js";
 
 /**
  * MSDFText - High-quality text rendering using Multi-channel Signed Distance Fields
- * 
+ *
  * Usage:
  *   const text = await MSDFText.load('/path/to/font.json');
  *   text.setText("Hello World");
@@ -59,7 +54,10 @@ export class MSDFText {
     const fontData = await response.json();
 
     // Load texture atlas
-    const basePath = fontJsonPath.substring(0, fontJsonPath.lastIndexOf("/") + 1);
+    const basePath = fontJsonPath.substring(
+      0,
+      fontJsonPath.lastIndexOf("/") + 1
+    );
     const texturePath = basePath + fontData.pages[0];
 
     const textureLoader = new THREE.TextureLoader();
@@ -125,7 +123,8 @@ export class MSDFText {
 
       const char = this.getChar(charCode);
       const nextCharCode = i < text.length - 1 ? text.charCodeAt(i + 1) : -1;
-      const kerning = nextCharCode >= 0 ? this.getKerning(charCode, nextCharCode) : 0;
+      const kerning =
+        nextCharCode >= 0 ? this.getKerning(charCode, nextCharCode) : 0;
 
       lineWidth += char.xadvance + kerning;
     }
@@ -169,7 +168,10 @@ export class MSDFText {
 
     // Copy base geometry attributes (no normals needed)
     instancedGeometry.setIndex(geometry.index);
-    instancedGeometry.setAttribute("position", geometry.getAttribute("position"));
+    instancedGeometry.setAttribute(
+      "position",
+      geometry.getAttribute("position")
+    );
     instancedGeometry.setAttribute("uv", geometry.getAttribute("uv"));
 
     // Create instance attributes
@@ -196,8 +198,10 @@ export class MSDFText {
           lineWidth = 0;
         } else {
           const char = this.getChar(charCode);
-          const nextCharCode = i < text.length - 1 ? text.charCodeAt(i + 1) : -1;
-          const kerning = nextCharCode >= 0 ? this.getKerning(charCode, nextCharCode) : 0;
+          const nextCharCode =
+            i < text.length - 1 ? text.charCodeAt(i + 1) : -1;
+          const kerning =
+            nextCharCode >= 0 ? this.getKerning(charCode, nextCharCode) : 0;
           lineWidth += char.xadvance + kerning;
         }
       }
@@ -205,9 +209,7 @@ export class MSDFText {
     }
 
     let currentLine = 0;
-    let lineOffsetX = centered
-      ? (measurements.width - lineWidths[0]) * 0.5
-      : 0;
+    let lineOffsetX = centered ? (measurements.width - lineWidths[0]) * 0.5 : 0;
 
     for (let i = 0; i < text.length; i++) {
       const charCode = text.charCodeAt(i);
@@ -237,7 +239,8 @@ export class MSDFText {
 
       const char = this.getChar(charCode);
       const nextCharCode = i < text.length - 1 ? text.charCodeAt(i + 1) : -1;
-      const kerning = nextCharCode >= 0 ? this.getKerning(charCode, nextCharCode) : 0;
+      const kerning =
+        nextCharCode >= 0 ? this.getKerning(charCode, nextCharCode) : 0;
 
       // Calculate UV coordinates in atlas
       const u = char.x / this.scaleW;
@@ -306,27 +309,21 @@ export class MSDFText {
    * Set text color
    */
   setColor(color) {
-    if (this.material) {
-      setMSDFColor(this.material, color);
-    }
+    this.material.userData.colorUniform.value.set(color);
   }
 
   /**
    * Set text opacity
    */
   setOpacity(opacity) {
-    if (this.material) {
-      setMSDFOpacity(this.material, opacity);
-    }
+    this.material.userData.opacityUniform.value = opacity;
   }
 
   /**
    * Set pixel scale for sharpness control
    */
   setPixelScale(pixelScale) {
-    if (this.material) {
-      setMSDFPixelScale(this.material, pixelScale);
-    }
+    this.material.userData.pixelScaleUniform.value = pixelScale;
   }
 
   /**
@@ -344,4 +341,3 @@ export class MSDFText {
     }
   }
 }
-

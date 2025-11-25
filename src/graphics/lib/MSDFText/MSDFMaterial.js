@@ -1,4 +1,6 @@
-import * as THREE from "three/webgpu";
+// import * as THREE from "three/webgpu";
+
+import { Color, DoubleSide } from "three";
 import {
   texture,
   uv,
@@ -24,7 +26,7 @@ export function createMSDFMaterial(msdfTexture, options = {}) {
   const material = new NodeMaterial();
 
   // Uniforms
-  const colorUniform = uniform(new THREE.Color(options.color || 0xffffff));
+  const colorUniform = uniform(new Color(options.color || 0xffffff));
   const opacityUniform = uniform(
     options.opacity !== undefined ? options.opacity : 1.0
   );
@@ -85,7 +87,7 @@ export function createMSDFMaterial(msdfTexture, options = {}) {
 
   // Enable transparency
   material.transparent = true;
-  material.side = THREE.DoubleSide;
+  material.side = DoubleSide;
   material.depthWrite = false;
 
   // Store references for later updates
@@ -96,33 +98,33 @@ export function createMSDFMaterial(msdfTexture, options = {}) {
   return material;
 }
 
-/**
- * Helper to update material color
- */
-export function setMSDFColor(material, color) {
-  if (material.userData.colorUniform) {
-    if (color instanceof THREE.Color) {
-      material.userData.colorUniform.value.copy(color);
-    } else {
-      material.userData.colorUniform.value.set(color);
-    }
-  }
-}
+// /**
+//  * Helper to update material color
+//  */
+// export function setMSDFColor(material, color) {
+//   if (material.userData.colorUniform) {
+//     if (color instanceof Color) {
+//       material.userData.colorUniform.value.copy(color);
+//     } else {
+//       material.userData.colorUniform.value.set(color);
+//     }
+//   }
+// }
 
-/**
- * Helper to update material opacity
- */
-export function setMSDFOpacity(material, opacity) {
-  if (material.userData.opacityUniform) {
-    material.userData.opacityUniform.value = opacity;
-  }
-}
+// /**
+//  * Helper to update material opacity
+//  */
+// export function setMSDFOpacity(material, opacity) {
+//   if (material.userData.opacityUniform) {
+//     material.userData.opacityUniform.value = opacity;
+//   }
+// }
 
-/**
- * Helper to update pixel scale for sharpness control
- */
-export function setMSDFPixelScale(material, pixelScale) {
-  if (material.userData.pixelScaleUniform) {
-    material.userData.pixelScaleUniform.value = pixelScale;
-  }
-}
+// /**
+//  * Helper to update pixel scale for sharpness control
+//  */
+// export function setMSDFPixelScale(material, pixelScale) {
+//   if (material.userData.pixelScaleUniform) {
+//     material.userData.pixelScaleUniform.value = pixelScale;
+//   }
+// }

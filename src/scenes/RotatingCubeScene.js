@@ -1,6 +1,7 @@
 import * as THREE from "three/webgpu";
 import { BaseScene } from "./BaseScene.js";
 import { FadeTransition } from "../graphics/transitions/FadeTransition.js";
+import { MSDFText } from "../graphics/lib/MSDFText/index.js";
 
 export class RotatingCubeScene extends BaseScene {
   constructor(controls) {
@@ -39,6 +40,24 @@ export class RotatingCubeScene extends BaseScene {
 
     this.rotateX = controls?.rotateX ?? 0.6;
     this.rotateY = controls?.rotateY ?? 0.9;
+
+    this.loadText();
+  }
+
+  async loadText() {
+    this.textObject = await MSDFText.load(
+      "/assets/fonts/msdf/kenpixel/kenpixel-msdf.json",
+      {
+        color: 0xfff,
+        opacity: 1.0,
+        pixelScale: 0.008,
+      }
+    );
+
+    this.textObject.setText("HELLO WORLD", { centered: true });
+    this.textObject.mesh.position.set(0, 2, 0);
+    this.textObject.mesh.scale.setScalar(0.01);
+    this.scene.add(this.textObject.mesh);
   }
 
   update(elapsedMs) {
