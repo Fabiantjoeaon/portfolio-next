@@ -120,27 +120,25 @@ export class PersistentScene {
 
   /**
    * Add a test object (rotating cube) to the persistent scene
-   * The object is added as a child of the camera so it maintains
-   * the same screen position across different scene camera positions.
+   * The object is positioned in world space at origin.
    */
   addTestObject() {
     if (this.testObject) {
       return; // Already exists
     }
 
-    const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+    const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
     const material = new THREE.MeshStandardMaterial({
       color: 0xff6b6b,
       metalness: 0.3,
       roughness: 0.4,
     });
     this.testObject = new THREE.Mesh(geometry, material);
-    // Position relative to camera view (right side of screen, in front)
-    this.testObject.position.set(2, 0, -5);
+    // Position in world space - centered at origin, slightly elevated
+    this.testObject.position.set(0, 1, 0);
 
-    // Add to camera so it moves with the view
-    this.camera.add(this.testObject);
-    this.scene.add(this.camera);
+    // Add directly to scene (not to camera)
+    this.scene.add(this.testObject);
   }
 
   /**

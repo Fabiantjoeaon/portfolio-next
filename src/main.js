@@ -57,7 +57,7 @@ class App {
   async setupScenes() {
     // Instantiate scenes in declared order
     this.sceneInstances = createScenes();
-    this.sceneManager = new SceneManager(this.renderer);
+    this.sceneManager = new SceneManager(this.renderer, this.debug);
     this.sceneIds = this.sceneInstances.map((inst) =>
       this.sceneManager.addScene(inst)
     );
@@ -76,20 +76,6 @@ class App {
 
     this.renderer.setPixelRatio(devicePixelRatio);
     this.renderer.setSize(width, height, false);
-
-    // Update active cameras (transition manager sets active pair)
-    const activePrevId = this.sceneManager.activePrevId;
-    const activeNextId = this.sceneManager.activeNextId;
-    const prevInst = this.sceneInstances[this.sceneIds.indexOf(activePrevId)];
-    const nextInst = this.sceneInstances[this.sceneIds.indexOf(activeNextId)];
-    if (prevInst?.camera) {
-      prevInst.camera.aspect = width / height;
-      prevInst.camera.updateProjectionMatrix();
-    }
-    if (nextInst?.camera && nextInst !== prevInst) {
-      nextInst.camera.aspect = width / height;
-      nextInst.camera.updateProjectionMatrix();
-    }
 
     this.sceneManager?.resize({
       width,

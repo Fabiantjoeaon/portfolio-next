@@ -20,8 +20,12 @@ export class SpheresScene extends BaseScene {
         }),
     ];
 
-    this.camera.position.set(4, 3, 7);
-    this.camera.lookAt(0, 0, 0);
+    // Define camera state for this scene
+    this.cameraState = {
+      position: new THREE.Vector3(4, 3, 7),
+      lookAt: new THREE.Vector3(0, 0, 0),
+      fov: 75,
+    };
 
     this.ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
     this.scene.add(this.ambientLight);

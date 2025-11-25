@@ -55,6 +55,7 @@ export class TransitionManager {
     this.nextIdx = (this.prevIdx + 1) % this.sceneIds.length;
 
     // Update the active pair to reflect the new prev/next
+    // This also updates the camera target state
     this.sceneManager.setActivePair(
       this.sceneIds[this.prevIdx],
       this.sceneIds[this.nextIdx]
@@ -65,6 +66,9 @@ export class TransitionManager {
 
     // Reset mix to 0 to display prev (the scene we just transitioned to)
     this.sceneManager.setMix(0);
+
+    // Snap camera to target (complete interpolation)
+    this.sceneManager.updateCameraTransition(1.0);
 
     // Notify SceneManager that we're no longer transitioning
     this.sceneManager.setTransitioning(false);
@@ -78,6 +82,9 @@ export class TransitionManager {
     const elapsed = nowMs - this.t0;
 
     if (this.phase === "idle") {
+      // Update camera controller (for orbit controls in debug mode)
+      this.sceneManager.updateCameraTransition(0);
+
       // Hold current scene (prev) fully visible at mix=0
       if (elapsed >= this.idleMs) {
         // Start transition - apply the transition NOW after textures have been rendered
@@ -95,6 +102,9 @@ export class TransitionManager {
       const mix = Math.min(Math.max(elapsed / this.transitionMs, 0), 1);
 
       this.sceneManager.setMix(mix);
+      // Update camera interpolation based on transition progress
+      this.sceneManager.updateCameraTransition(mix);
+
       if (mix >= 1) {
         this.onTransitionComplete();
         this.t0 = nowMs;

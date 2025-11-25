@@ -8,8 +8,12 @@ export class RotatingCubeScene extends BaseScene {
     this.scene.background = new THREE.Color(0x0b0e12);
     this.transition = new FadeTransition();
 
-    this.camera.position.set(3, 2, 5);
-    this.camera.lookAt(0, 0, 0);
+    // Define camera state for this scene
+    this.cameraState = {
+      position: new THREE.Vector3(3, 2, 5),
+      lookAt: new THREE.Vector3(0, 0, 0),
+      fov: 75,
+    };
 
     this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     this.scene.add(this.ambientLight);

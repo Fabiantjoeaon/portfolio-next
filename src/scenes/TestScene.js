@@ -20,8 +20,12 @@ export class TestScene extends BaseScene {
         }),
     ];
 
-    this.camera.position.set(3, 2, 5);
-    this.camera.lookAt(0, 0, 0);
+    // Define camera state for this scene
+    this.cameraState = {
+      position: new THREE.Vector3(3, 2, 5),
+      lookAt: new THREE.Vector3(0, 0, 0),
+      fov: 75,
+    };
 
     this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     this.scene.add(this.ambientLight);

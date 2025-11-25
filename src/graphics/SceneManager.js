@@ -4,11 +4,12 @@ import { createGBuffer, resizeGBuffer } from "./gbuffer.js";
 import { createGBufferMaterial } from "./materials/GBufferMaterial.js";
 import { PostProcessingMaterial } from "./materials/PostMaterial.js";
 import { PersistentScene } from "./PersistentScene.js";
+import { CameraController } from "./CameraController.js";
 
 let _nextSceneId = 1;
 
 export class SceneManager {
-  constructor(renderer) {
+  constructor(renderer, debug = false) {
     this.renderer = renderer;
 
     const { innerWidth: width, innerHeight: height, devicePixelRatio } = window;
@@ -18,11 +19,15 @@ export class SceneManager {
       devicePixelRatio: Math.min(devicePixelRatio || 1, 2),
     };
 
-    this.scenes = new Map(); // id -> { scene, camera, update, gbuffer, gbufferMat }
+    this.scenes = new Map(); // id -> { scene, cameraState, update, gbuffer, gbufferMat }
     this.activePrevId = null;
     this.activeNextId = null;
     this.mixValue = 0.0;
     this.isTransitioning = false;
+
+    // Create shared camera controller
+    this.cameraController = new CameraController(renderer, debug);
+    this.cameraController.setAspect(width / height);
 
     this.persistent = new PersistentScene();
     this.persistent.initGBuffer(
@@ -45,20 +50,32 @@ export class SceneManager {
 
     this.scenes.set(id, {
       scene: sceneObj.scene,
-      camera: sceneObj.camera,
+      cameraState: sceneObj.cameraState,
       update: sceneObj.update?.bind?.(sceneObj) ?? (() => {}),
       sceneObj,
       gbuffer,
       gbufferMat,
     });
-    if (this.activePrevId === null) this.activePrevId = id;
-    else if (this.activeNextId === null) this.activeNextId = id;
+    if (this.activePrevId === null) {
+      this.activePrevId = id;
+      // Set initial camera state from first scene
+      if (sceneObj.cameraState) {
+        this.cameraController.setTargetState(sceneObj.cameraState);
+        this.cameraController.snapToTarget();
+      }
+    } else if (this.activeNextId === null) this.activeNextId = id;
     return id;
   }
 
   setActivePair(prevId, nextId) {
     this.activePrevId = prevId;
     this.activeNextId = nextId;
+
+    // Update camera target state when changing active scene
+    const prevScene = this.scenes.get(prevId);
+    if (prevScene?.cameraState) {
+      this.cameraController.setTargetState(prevScene.cameraState);
+    }
   }
 
   setMix(value) {
@@ -68,6 +85,11 @@ export class SceneManager {
 
   setTransitioning(isTransitioning) {
     this.isTransitioning = isTransitioning;
+  }
+
+  updateCameraTransition(progress) {
+    // Update camera interpolation based on transition progress
+    this.cameraController.update(progress);
   }
 
   resize({ width, height, devicePixelRatio }) {
@@ -81,25 +103,27 @@ export class SceneManager {
         devicePixelRatio
       );
       entry.gbuffer = resized;
-
-      entry.camera.aspect = width / height;
-      entry.camera.updateProjectionMatrix();
     }
 
-    // Resize persistent gbuffer and update camera
+    // Update shared camera aspect
+    this.cameraController.setAspect(width / height);
+
+    // Resize persistent gbuffer
     this.persistent.resizeGBuffer(
       width,
       height,
       devicePixelRatio,
       resizeGBuffer
     );
-    this.persistent.updateCameraAspect(width / height);
   }
 
   render(timeMs) {
     const renderer = this.renderer;
     const prev = this.scenes.get(this.activePrevId);
     const next = this.scenes.get(this.activeNextId);
+
+    // Get the shared camera
+    const camera = this.cameraController.camera;
 
     // Always update and render the prev scene
     if (prev?.update) prev.update(timeMs);
@@ -112,7 +136,7 @@ export class SceneManager {
         })
       );
       prev.scene.overrideMaterial = prev.gbufferMat;
-      renderer.render(prev.scene, prev.camera);
+      renderer.render(prev.scene, camera);
       prev.scene.overrideMaterial = null;
       renderer.setMRT(null);
     }
@@ -129,14 +153,13 @@ export class SceneManager {
         })
       );
       next.scene.overrideMaterial = next.gbufferMat;
-      renderer.render(next.scene, next.camera);
+      renderer.render(next.scene, camera);
       next.scene.overrideMaterial = null;
       renderer.setMRT(null);
     }
 
-    // Render persistent scene to its own gbuffer
-    if (!this.persistent.isEmpty() && prev) {
-      this.persistent.syncCamera(prev.camera);
+    // Render persistent scene to its own gbuffer using shared camera
+    if (!this.persistent.isEmpty()) {
       renderer.setRenderTarget(this.persistent.gbuffer.target);
       renderer.setMRT(
         mrt({
@@ -145,7 +168,7 @@ export class SceneManager {
         })
       );
       this.persistent.scene.overrideMaterial = this.persistent.gbufferMat;
-      renderer.render(this.persistent.scene, this.persistent.camera);
+      renderer.render(this.persistent.scene, camera);
       this.persistent.scene.overrideMaterial = null;
       renderer.setMRT(null);
     }

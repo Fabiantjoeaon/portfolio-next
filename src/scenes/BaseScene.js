@@ -1,37 +1,20 @@
 import * as THREE from "three/webgpu";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 export class BaseScene {
   constructor(config = {}) {
     this.name = config.name || "BaseScene";
     this.scene = new THREE.Scene();
 
-    const { innerWidth, innerHeight } = window;
-
-    this.camera = new THREE.PerspectiveCamera(
-      60,
-      innerWidth / innerHeight,
-      0.1,
-      1000
-    );
-
-    // Initialize OrbitControls
-    this.controls = null;
-    const domElement = document.querySelector("#app-canvas");
-
-    this.controls = new OrbitControls(this.camera, domElement);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
+    // Define camera state instead of creating a camera instance
+    // Subclasses should override this to define their camera viewpoint
+    this.cameraState = {
+      position: new THREE.Vector3(0, 0, 5),
+      lookAt: new THREE.Vector3(0, 0, 0),
+      fov: 75,
+    };
   }
 
   update() {
-    if (this.controls) {
-      this.controls.update();
-    }
+    // Override in subclasses to update scene content
   }
-
-  // resize() {
-  //   this.camera.aspect = window.innerWidth / window.innerHeight;
-  //   this.camera.updateProjectionMatrix();
-  // }
 }
