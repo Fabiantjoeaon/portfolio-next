@@ -125,6 +125,8 @@ export class SceneManager {
     // Get the shared camera
     const camera = this.cameraController.camera;
 
+    this.persistent.update(timeMs);
+
     // Always update and render the prev scene
     if (prev?.update) prev.update(timeMs);
     if (prev) {

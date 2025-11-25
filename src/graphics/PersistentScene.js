@@ -141,21 +141,7 @@ export class PersistentScene {
     this.scene.add(this.testObject);
   }
 
-  /**
-   * Remove the test object from the persistent scene
-   */
-  removeTestObject() {
-    if (this.testObject) {
-      this.scene.remove(this.testObject);
-      this.testObject = null;
-    }
-  }
-
-  /**
-   * Update the test object animation
-   * @param {number} time - Current time in milliseconds
-   */
-  updateTestObject(time) {
+  update(time) {
     if (this.testObject) {
       this.testObject.rotation.x = time * 0.0005;
       this.testObject.rotation.y = time * 0.001;

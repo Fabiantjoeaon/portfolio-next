@@ -99,9 +99,6 @@ class App {
       return;
     }
 
-    // Update persistent scene animations
-    this.sceneManager.persistent.updateTestObject(time);
-
     this.transitionManager?.update(time);
     this.sceneManager.render(time);
     if (this.stats) this.stats.end();
