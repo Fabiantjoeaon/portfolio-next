@@ -1,6 +1,6 @@
 import * as THREE from "three/webgpu";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { easeInOutCubic } from "../lib/easing.js";
+import { inOutQuad } from "../lib/easing.js";
 
 /**
  * Manages a shared camera instance with state interpolation.
@@ -91,7 +91,7 @@ export class CameraController {
     const t = THREE.MathUtils.clamp(transitionProgress, 0, 1);
 
     // Smooth interpolation using easing
-    const eased = easeInOutCubic(t);
+    const eased = inOutQuad(t);
 
     // Interpolate position
     this.currentState.position.lerp(this.targetState.position, eased);
