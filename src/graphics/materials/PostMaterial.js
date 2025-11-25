@@ -1,4 +1,4 @@
-import { texture, uv, uniform, vec3 } from "three/tsl";
+import { texture, uv, uniform, vec3, mix, step } from "three/tsl";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 
 /**
@@ -20,6 +20,8 @@ export class PostProcessingMaterial {
     this.prevDepth = null;
     this.nextNormal = null;
     this.nextDepth = null;
+    this.persistentTex = null;
+    this.persistentDepth = null;
 
     this.transition = null;
     this.postprocessingChain = null;
@@ -42,7 +44,31 @@ export class PostProcessingMaterial {
         nextDepth: this.nextDepth,
       });
 
-      // Apply optional postprocessing chain after the base transition blend.
+      // Composite persistent layer with depth testing (before postprocessing)
+      if (this.persistentTex && this.persistentDepth && this.prevDepth) {
+        const persistentSample = texture(this.persistentTex, this.uvNode);
+        const persistentDepthSample = texture(
+          this.persistentDepth,
+          this.uvNode
+        ).x;
+
+        // Blend scene depths based on transition mix
+        const prevDepthSample = texture(this.prevDepth, this.uvNode).x;
+        const blendedDepth = this.nextDepth
+          ? mix(
+              prevDepthSample,
+              texture(this.nextDepth, this.uvNode).x,
+              this.mixNode
+            )
+          : prevDepthSample;
+
+        // Depth test: if persistent is closer (smaller depth), use persistent color
+        // step(a, b) returns 1 if b >= a, else 0
+        const depthTest = step(persistentDepthSample, blendedDepth);
+        colorNode = mix(colorNode, persistentSample.rgb, depthTest);
+      }
+
+      // Apply optional postprocessing chain after compositing persistent layer
       if (
         Array.isArray(this.postprocessingChain) &&
         this.postprocessingChain.length > 0
@@ -71,7 +97,16 @@ export class PostProcessingMaterial {
   }
 
   setInputs(inputs) {
-    const { prev, next, prevNormal, prevDepth, nextNormal, nextDepth } = inputs;
+    const {
+      prev,
+      next,
+      prevNormal,
+      prevDepth,
+      nextNormal,
+      nextDepth,
+      persistent,
+      persistentDepth,
+    } = inputs;
     let graphDirty = false;
 
     // Update textures and check for changes
@@ -83,12 +118,17 @@ export class PostProcessingMaterial {
       this.nextTex = next;
       graphDirty = true;
     }
+    if (persistent !== undefined && persistent !== this.persistentTex) {
+      this.persistentTex = persistent;
+      graphDirty = true;
+    }
 
     // Update optional attachments (sticky: keep existing if undefined)
     if (prevNormal !== undefined) this.prevNormal = prevNormal;
     if (prevDepth !== undefined) this.prevDepth = prevDepth;
     if (nextNormal !== undefined) this.nextNormal = nextNormal;
     if (nextDepth !== undefined) this.nextDepth = nextDepth;
+    if (persistentDepth !== undefined) this.persistentDepth = persistentDepth;
 
     // Rebuild only when textures change OR when transition was updated
     if (graphDirty || this._needsRebuild) {

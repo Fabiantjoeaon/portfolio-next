@@ -3,6 +3,7 @@ import { PostProcessingScene } from "./postScene.js";
 import { createGBuffer, resizeGBuffer } from "./gbuffer.js";
 import { createGBufferMaterial } from "./materials/GBufferMaterial.js";
 import { PostProcessingMaterial } from "./materials/PostMaterial.js";
+import { PersistentScene } from "./PersistentScene.js";
 
 let _nextSceneId = 1;
 
@@ -22,6 +23,15 @@ export class SceneManager {
     this.activeNextId = null;
     this.mixValue = 0.0;
     this.isTransitioning = false;
+
+    this.persistent = new PersistentScene();
+    this.persistent.initGBuffer(
+      width,
+      height,
+      devicePixelRatio,
+      createGBuffer,
+      createGBufferMaterial
+    );
 
     this.post = new PostProcessingScene();
   }
@@ -75,6 +85,15 @@ export class SceneManager {
       entry.camera.aspect = width / height;
       entry.camera.updateProjectionMatrix();
     }
+
+    // Resize persistent gbuffer and update camera
+    this.persistent.resizeGBuffer(
+      width,
+      height,
+      devicePixelRatio,
+      resizeGBuffer
+    );
+    this.persistent.updateCameraAspect(width / height);
   }
 
   render(timeMs) {
@@ -92,9 +111,9 @@ export class SceneManager {
           normal: vec3(0),
         })
       );
-      //prev.scene.overrideMaterial = prev.gbufferMat;
+      prev.scene.overrideMaterial = prev.gbufferMat;
       renderer.render(prev.scene, prev.camera);
-      //prev.scene.overrideMaterial = null;
+      prev.scene.overrideMaterial = null;
       renderer.setMRT(null);
     }
 
@@ -109,9 +128,25 @@ export class SceneManager {
           normal: vec3(0),
         })
       );
-      //next.scene.overrideMaterial = next.gbufferMat;
+      next.scene.overrideMaterial = next.gbufferMat;
       renderer.render(next.scene, next.camera);
-      //next.scene.overrideMaterial = null;
+      next.scene.overrideMaterial = null;
+      renderer.setMRT(null);
+    }
+
+    // Render persistent scene to its own gbuffer
+    if (!this.persistent.isEmpty() && prev) {
+      this.persistent.syncCamera(prev.camera);
+      renderer.setRenderTarget(this.persistent.gbuffer.target);
+      renderer.setMRT(
+        mrt({
+          output,
+          normal: vec3(0),
+        })
+      );
+      this.persistent.scene.overrideMaterial = this.persistent.gbufferMat;
+      renderer.render(this.persistent.scene, this.persistent.camera);
+      this.persistent.scene.overrideMaterial = null;
       renderer.setMRT(null);
     }
 
@@ -125,6 +160,8 @@ export class SceneManager {
         next: nTex,
         prevDepth: prev?.gbuffer.depth,
         nextDepth: next?.gbuffer.depth,
+        persistent: this.persistent.gbuffer?.albedo,
+        persistentDepth: this.persistent.gbuffer?.depth,
       });
     }
 

@@ -64,6 +64,9 @@ class App {
     this.transitionManager = new TransitionManager(this.sceneManager);
     this.transitionManager.setSequence(this.sceneIds, this.sceneInstances);
     this.transitionManager.start(performance.now());
+
+    // Add persistent test object
+    this.sceneManager.persistent.addTestObject();
   }
 
   onResize() {
@@ -109,6 +112,9 @@ class App {
       if (this.stats) this.stats.end();
       return;
     }
+
+    // Update persistent scene animations
+    this.sceneManager.persistent.updateTestObject(time);
 
     this.transitionManager?.update(time);
     this.sceneManager.render(time);
