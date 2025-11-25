@@ -1,8 +1,7 @@
-import { mrt, output, vec3 } from "three/tsl";
-import { PostProcessingScene } from "./postScene.js";
+import { mrt, output } from "three/tsl";
+import { PostProcessingScene } from "./PostProcessingScene.js";
 import { createGBuffer, resizeGBuffer } from "./gbuffer.js";
-import { createGBufferMaterial } from "./materials/GBufferMaterial.js";
-import { PostProcessingMaterial } from "./materials/PostMaterial.js";
+import { createNormalOutputNode } from "./materials/GBufferMaterial.js";
 import { PersistentScene } from "./PersistentScene.js";
 import { CameraController } from "./CameraController.js";
 
@@ -19,7 +18,7 @@ export class SceneManager {
       devicePixelRatio: Math.min(devicePixelRatio || 1, 2),
     };
 
-    this.scenes = new Map(); // id -> { scene, cameraState, update, gbuffer, gbufferMat }
+    this.scenes = new Map(); // id -> { scene, cameraState, update, gbuffer }
     this.activePrevId = null;
     this.activeNextId = null;
     this.mixValue = 0.0;
@@ -29,13 +28,15 @@ export class SceneManager {
     this.cameraController = new CameraController(renderer, debug);
     this.cameraController.setAspect(width / height);
 
+    // Create shared normal output node for MRT
+    this.normalOutputNode = createNormalOutputNode();
+
     this.persistent = new PersistentScene();
     this.persistent.initGBuffer(
       width,
       height,
       devicePixelRatio,
-      createGBuffer,
-      createGBufferMaterial
+      createGBuffer
     );
 
     this.post = new PostProcessingScene();
@@ -46,7 +47,6 @@ export class SceneManager {
     const { width, height, devicePixelRatio } = this.viewport;
 
     const gbuffer = createGBuffer(width, height, devicePixelRatio);
-    const gbufferMat = createGBufferMaterial(sceneObj?.albedoHex ?? 0xffffff);
 
     this.scenes.set(id, {
       scene: sceneObj.scene,
@@ -54,7 +54,6 @@ export class SceneManager {
       update: sceneObj.update?.bind?.(sceneObj) ?? (() => {}),
       sceneObj,
       gbuffer,
-      gbufferMat,
     });
     if (this.activePrevId === null) {
       this.activePrevId = id;
@@ -134,12 +133,11 @@ export class SceneManager {
       renderer.setMRT(
         mrt({
           output,
-          normal: vec3(0),
+          normal: this.normalOutputNode,
         })
       );
-      prev.scene.overrideMaterial = prev.gbufferMat;
+      // No overrideMaterial - use forward rendering with proper materials/lighting
       renderer.render(prev.scene, camera);
-      prev.scene.overrideMaterial = null;
       renderer.setMRT(null);
     }
 
@@ -151,12 +149,11 @@ export class SceneManager {
       renderer.setMRT(
         mrt({
           output,
-          normal: vec3(0),
+          normal: this.normalOutputNode,
         })
       );
-      next.scene.overrideMaterial = next.gbufferMat;
+      // No overrideMaterial - use forward rendering with proper materials/lighting
       renderer.render(next.scene, camera);
-      next.scene.overrideMaterial = null;
       renderer.setMRT(null);
     }
 
@@ -166,12 +163,11 @@ export class SceneManager {
       renderer.setMRT(
         mrt({
           output,
-          normal: vec3(0),
+          normal: this.normalOutputNode,
         })
       );
-      this.persistent.scene.overrideMaterial = this.persistent.gbufferMat;
+      // No overrideMaterial - use forward rendering with proper materials/lighting
       renderer.render(this.persistent.scene, camera);
-      this.persistent.scene.overrideMaterial = null;
       renderer.setMRT(null);
     }
 

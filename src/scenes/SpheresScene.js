@@ -55,8 +55,6 @@ export class SpheresScene extends BaseScene {
     this.group = group;
     this.rotateX = controls?.rotateX ?? 0.2;
     this.rotateY = controls?.rotateY ?? 0.35;
-
-    this.albedoHex = 0x88aaff;
   }
 
   update(elapsedMs) {

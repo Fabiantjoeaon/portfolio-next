@@ -11,7 +11,6 @@ export class PersistentScene {
     this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     this.testObject = null;
     this.gbuffer = null;
-    this.gbufferMat = null;
 
     // Add lighting to the persistent scene
     this._setupLighting();
@@ -94,11 +93,9 @@ export class PersistentScene {
     width,
     height,
     devicePixelRatio,
-    createGBuffer,
-    createGBufferMaterial
+    createGBuffer
   ) {
     this.gbuffer = createGBuffer(width, height, devicePixelRatio);
-    this.gbufferMat = createGBufferMaterial(0xff6b6b); // Red for persistent objects
   }
 
   /**

@@ -9,8 +9,6 @@
 
 - Grid w compute shader
 
-- Find way to have an object consistent across scenes
-
 - Post pro
     - Volumetric lighting
     - Bloom
@@ -34,6 +32,8 @@
     - Make screen adaptive + mobile version
 
 - Particle system
+
+
 
 
 
