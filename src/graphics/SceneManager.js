@@ -32,12 +32,7 @@ export class SceneManager {
     this.normalOutputNode = createNormalOutputNode();
 
     this.persistent = new PersistentScene();
-    this.persistent.initGBuffer(
-      width,
-      height,
-      devicePixelRatio,
-      createGBuffer
-    );
+    this.persistent.initGBuffer(width, height, devicePixelRatio, createGBuffer);
 
     this.post = new PostProcessingScene();
   }

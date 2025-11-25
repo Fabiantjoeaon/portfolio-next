@@ -89,12 +89,7 @@ export class PersistentScene {
    * @param {number} height - Viewport height
    * @param {number} devicePixelRatio - Device pixel ratio
    */
-  initGBuffer(
-    width,
-    height,
-    devicePixelRatio,
-    createGBuffer
-  ) {
+  initGBuffer(width, height, devicePixelRatio, createGBuffer) {
     this.gbuffer = createGBuffer(width, height, devicePixelRatio);
   }
 

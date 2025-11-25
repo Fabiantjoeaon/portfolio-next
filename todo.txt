@@ -1,5 +1,9 @@
 // DOC: https://threejs.org/docs/#TSL
 
+- MSDF text
+    - https://webgpu.github.io/webgpu-samples/?sample=textRenderingMsdf
+    - https://github.com/leochocolat/three-msdf-text-utils?tab=readme-ov-file
+
 - Render normals, worldposition
 
 - mouse movement
@@ -15,9 +19,7 @@
     - Data moshing
         - https://ompuco.wordpress.com/2018/03/29/creating-your-own-datamosh-effect/
     
-- MSDF text
-    - https://webgpu.github.io/webgpu-samples/?sample=textRenderingMsdf
-    - https://github.com/leochocolat/three-msdf-text-utils?tab=readme-ov-file
+
 
 - Lighting
     - Custom set-up with MRO textures?
@@ -32,9 +34,6 @@
     - Make screen adaptive + mobile version
 
 - Particle system
-
-
-
 
 
 POST PRO
