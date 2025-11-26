@@ -45,6 +45,7 @@ export async function loadMSDFFont(jsonPath) {
     texture.magFilter = LinearFilter;
     texture.generateMipmaps = false;
     texture.colorSpace = LinearSRGBColorSpace;
+    texture.flipY = false; // Don't flip - BMFont coordinates are from top
     texture.needsUpdate = true;
     
     // Ensure texture is fully ready

@@ -17,8 +17,8 @@ export default class TextTestScene extends BaseScene {
 
     this.transition = new FadeTransition();
 
-    // Set a VERY obvious background so we know the scene is rendering
-    this.scene.background = new THREE.Color(0xff0000); // BRIGHT RED background for testing
+    // Set a dark background to see white text
+    this.scene.background = new THREE.Color(0x202020); // Dark gray background
 
     // Define camera state for this scene - matching RotatingCubeScene
     this.cameraState = {
@@ -36,13 +36,13 @@ export default class TextTestScene extends BaseScene {
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     this.scene.add(ambientLight);
 
-    // Add a VERY visible test cube to the side
+    // Add a test cube to the side
     const testCube = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.BoxGeometry(0.5, 0.5, 0.5),
       new THREE.MeshBasicMaterial({ color: 0xff0000 })
     );
     testCube.position.set(-2, 0, 0); // Move cube to the left
-    this.scene.add(testCube);
+    //this.scene.add(testCube);
     this.testCube = testCube;
     console.log("[TextTestScene] Added test cube at:", testCube.position);
     console.log(
@@ -65,8 +65,8 @@ export default class TextTestScene extends BaseScene {
 
       // Configure text properties
       text.text = "Hello WebGPU!";
-      text.fontSize = 1.0;
-      text.position.set(0, 1.5, 0); // Move above the cube
+      text.fontSize = 0.5; // Smaller font size for testing
+      text.position.set(0, 0, 0); // Center position
       text.color = 0xffffff;
       text.anchorX = "center";
       text.anchorY = "middle";
@@ -122,6 +122,26 @@ export default class TextTestScene extends BaseScene {
         console.log(
           "✅ [TextTestScene] Has aTroikaGlyphBounds:",
           text.geometry.attributes.aTroikaGlyphBounds
+        );
+        console.log(
+          "✅ [TextTestScene] Bounding box:",
+          text.geometry.boundingBox
+        );
+        console.log(
+          "✅ [TextTestScene] Block bounds:",
+          text.textRenderInfo.blockBounds
+        );
+        console.log(
+          "✅ [TextTestScene] Text world position:",
+          text.getWorldPosition(new THREE.Vector3())
+        );
+        console.log(
+          "✅ [TextTestScene] First 3 glyph UVs:",
+          text.geometry.attributes.aTroikaMSDFUVs
+            ? Array.from(
+                text.geometry.attributes.aTroikaMSDFUVs.array.slice(0, 12)
+              )
+            : "No UV attribute"
         );
       });
     } catch (error) {

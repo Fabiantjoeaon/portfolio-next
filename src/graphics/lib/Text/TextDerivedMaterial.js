@@ -141,8 +141,11 @@ export function createTextDerivedMaterial(baseMaterial, options = {}) {
     const hasMSDFUVs = aTroikaMSDFUVs.z.greaterThan(0.0);
 
     // For MSDF: use the direct UV coordinates from the attribute
-    const msdfUV = aTroikaMSDFUVs.xy.add(
-      positionLocal.xy.mul(aTroikaMSDFUVs.zw)
+    // Flip V coordinate: positionLocal.y=0 (bottom) should map to uvY+uvH (bottom of glyph)
+    // and positionLocal.y=1 (top) should map to uvY (top of glyph)
+    const msdfUV = vec2(
+      aTroikaMSDFUVs.x.add(positionLocal.x.mul(aTroikaMSDFUVs.z)),
+      aTroikaMSDFUVs.y.add(positionLocal.y.oneMinus().mul(aTroikaMSDFUVs.w))
     );
 
     // For SDF: calculate atlas UVs from glyph index (existing logic)
@@ -234,7 +237,7 @@ export function createTextDerivedMaterial(baseMaterial, options = {}) {
   // Set material properties
   textMaterial.transparent = true;
   textMaterial.side = DoubleSide;
-  textMaterial.depthWrite = false;
+  textMaterial.depthWrite = true; // Enable depth write so text occludes properly
   textMaterial.depthTest = true;
 
   // Store uniform holders for updates
