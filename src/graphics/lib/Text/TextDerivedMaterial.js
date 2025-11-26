@@ -55,45 +55,21 @@ const createDummyTexture = () => {
 export function createTextDerivedMaterial(baseMaterial, options = {}) {
   const textMaterial = new NodeMaterial();
 
-  console.log(
-    "[TextDerivedMaterial] Creating NodeMaterial with MSDF support",
-    options
-  );
-
   // Uniforms - use provided texture or create dummy
   const colorUniform = uniform(new Color(0xffffff));
   const actualTexture = options.texture || createDummyTexture();
 
   // Verify texture is valid for WebGPU/TSL
   if (!actualTexture || !actualTexture.isTexture) {
-    console.error(
-      "[TextDerivedMaterial] Invalid texture provided:",
-      actualTexture
-    );
     throw new Error("TextDerivedMaterial requires a valid THREE.Texture");
   }
 
   if (!actualTexture.image) {
-    console.error(
-      "[TextDerivedMaterial] Texture has no image data:",
-      actualTexture
-    );
     throw new Error("Texture must have image data loaded");
   }
 
   // Ensure texture is properly configured
   actualTexture.needsUpdate = true;
-
-  console.log("[TextDerivedMaterial] Using texture:", {
-    isTexture: actualTexture.isTexture,
-    hasImage: !!actualTexture.image,
-    imageSize: `${actualTexture.image.width}x${actualTexture.image.height}`,
-    uuid: actualTexture.uuid,
-    minFilter: actualTexture.minFilter,
-    magFilter: actualTexture.magFilter,
-    format: actualTexture.format,
-    type: actualTexture.type,
-  });
 
   // For TSL, use texture() to create a TextureNode, not uniform()
   const uTroikaSDFTexture = texture(actualTexture);
@@ -273,8 +249,6 @@ export function createTextDerivedMaterial(baseMaterial, options = {}) {
   textMaterial.isDerivedFrom = function (baseMat) {
     return false;
   };
-
-  console.log("[TextDerivedMaterial] Material created with positionNode");
 
   return textMaterial;
 }

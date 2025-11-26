@@ -18,11 +18,8 @@ const DEFAULT_MSDF_FONT = '/assets/fonts/msdf/kenpixel/kenpixel-msdf.json';
 export async function loadMSDFFont(jsonPath) {
   // Check cache first
   if (fontCache.has(jsonPath)) {
-    console.log('[MSDFLoader] Using cached font:', jsonPath);
     return fontCache.get(jsonPath);
   }
-
-  console.log('[MSDFLoader] Loading MSDF font:', jsonPath);
 
   try {
     // Load the JSON font data
@@ -52,12 +49,6 @@ export async function loadMSDFFont(jsonPath) {
     if (!texture.image || !texture.image.width || !texture.image.height) {
       throw new Error('Texture image not loaded properly');
     }
-    
-    console.log('[MSDFLoader] Texture loaded and configured:', {
-      width: texture.image.width,
-      height: texture.image.height,
-      isTexture: texture.isTexture
-    });
 
     // Build character lookup map
     const chars = new Map();
@@ -97,13 +88,6 @@ export async function loadMSDFFont(jsonPath) {
 
     // Cache the loaded font
     fontCache.set(jsonPath, font);
-
-    console.log('[MSDFLoader] Font loaded successfully:', jsonPath, {
-      charCount: chars.size,
-      kerningCount: kernings.size,
-      textureSize: `${metrics.scaleW}x${metrics.scaleH}`,
-      distanceRange: metrics.distanceRange,
-    });
 
     return font;
   } catch (error) {

@@ -55,11 +55,8 @@ function getTextRenderInfo(args, callback) {
   args = assign({}, args);
   const totalStart = now();
 
-  console.log("[TextBuilder] getTextRenderInfo called with:", args);
-
   // Check if this is an MSDF font request
   if (args.msdfFont || isMSDFFont(args.font)) {
-    console.log("[TextBuilder] MSDF font detected, using MSDF path");
     return getTextRenderInfoMSDF(args, callback, totalStart);
   }
 
@@ -73,8 +70,6 @@ function getTextRenderInfo(args, callback) {
     fonts.push({ label: "user", src: toAbsoluteURL(args.font) });
   }
   args.font = fonts;
-
-  console.log("[TextBuilder] Using fonts:", fonts);
 
   // Normalize text to a string
   args.text = "" + args.text;
@@ -132,10 +127,8 @@ function getTextRenderInfo(args, callback) {
 
   // Issue request to the typesetting engine
   const typeset = CONFIG.useWorker ? typesetInWorker : typesetOnMainThread;
-  console.log("[TextBuilder] Starting typeset");
   typeset(args)
     .then((result) => {
-      console.log("[TextBuilder] Typeset result:", result);
       const {
         glyphIds,
         glyphFontIndices,
@@ -243,8 +236,6 @@ function getTextRenderInfo(args, callback) {
         sdfTexture.needsUpdate = true;
       }
 
-      console.log("[TextBuilder] Need to generate", neededSDFs.length, "SDFs");
-
       // Generate SDFs for new glyphs
       Promise.all(
         neededSDFs.map((glyphInfo) =>
@@ -260,8 +251,6 @@ function getTextRenderInfo(args, callback) {
         }
         timings.sdfTotal = now() - sdfStart;
         timings.total = now() - totalStart;
-
-        console.log("[TextBuilder] Completed, calling callback");
 
         // Invoke callback with the text layout arrays and updated texture
         callback(
@@ -397,13 +386,10 @@ const typesetOnMainThread = typesetInWorker.onMainThread;
  * MSDF-specific text rendering path
  */
 async function getTextRenderInfoMSDF(args, callback, totalStart) {
-  console.log("[TextBuilder] Processing MSDF font request");
-
   try {
     // Load MSDF font
     const msdfFontPath = args.msdfFont || args.font;
     const msdfFont = await loadMSDFFont(msdfFontPath);
-    console.log("[TextBuilder] MSDF font loaded:", msdfFont);
 
     const { texture, chars, kernings, metrics } = msdfFont;
 
@@ -455,11 +441,6 @@ async function getTextRenderInfoMSDF(args, callback, totalStart) {
 
       const char = chars.get(charCode);
       if (!char) {
-        console.warn(
-          "[TextBuilder] Character not found in MSDF font:",
-          charCode,
-          String.fromCharCode(charCode)
-        );
         continue;
       }
 
@@ -482,19 +463,6 @@ async function getTextRenderInfoMSDF(args, callback, totalStart) {
 
       // Store as vec4: (uvX, uvY, uvW, uvH)
       glyphUVs.push(uvX, uvY, uvW, uvH);
-
-      // Debug first character
-      if (glyphIds.length === 1) {
-        console.log("[TextBuilder] First char UV:", {
-          charCode,
-          char: String.fromCharCode(charCode),
-          uvX,
-          uvY,
-          uvW,
-          uvH,
-          pixelPos: { x: char.x, y: char.y, w: char.width, h: char.height },
-        });
-      }
 
       // For MSDF, we use a simple sequential index
       glyphAtlasIndices.push(glyphIds.length - 1);
@@ -557,14 +525,6 @@ async function getTextRenderInfoMSDF(args, callback, totalStart) {
       maxX - anchorX,
       maxY - anchorY,
     ];
-
-    console.log("[TextBuilder] MSDF layout complete:", {
-      glyphCount: glyphIds.length,
-      blockBounds,
-      scale,
-      firstGlyphUV: glyphUVs.slice(0, 4),
-      textureSize: `${metrics.scaleW}x${metrics.scaleH}`,
-    });
 
     // Invoke callback with MSDF-specific data
     callback(

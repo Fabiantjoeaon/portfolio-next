@@ -10,8 +10,6 @@ import { GlyphsGeometry } from './GlyphsGeometry.js'
 import { createTextDerivedMaterial } from './TextDerivedMaterial.js'
 import { getTextRenderInfo } from './TextBuilder.js'
 
-console.log('[Text.js] Module loading...')
-
 const defaultStrokeColor = 0x808080
 
 const tempMat4 = new Matrix4()
@@ -139,8 +137,6 @@ class Text extends Mesh {
         this._isSyncing = true
         this.dispatchEvent(syncStartEvent)
 
-        console.log('[Text] Starting sync for text:', this.text)
-
         getTextRenderInfo({
           text: this.text,
           font: this.font,
@@ -165,7 +161,6 @@ class Text extends Mesh {
           gpuAccelerateSDF: this.gpuAccelerateSDF,
           unicodeFontsURL: this.unicodeFontsURL,
         }, textRenderInfo => {
-          console.log('[Text] Got textRenderInfo:', textRenderInfo)
           this._isSyncing = false
 
           // Save result for later use in onBeforeRender
@@ -181,24 +176,14 @@ class Text extends Mesh {
             textRenderInfo.glyphUVs
           )
 
-          console.log('[Text] Geometry updated, instanceCount:', this.geometry.instanceCount)
-          
           // Create material NOW with the real texture
           if (!this._materialReady) {
             const texture = textRenderInfo.sdfTexture
             
             // Validate texture before creating material
             if (!texture || !texture.isTexture) {
-              console.error('[Text] Invalid texture received:', texture)
               return
             }
-            
-            console.log('[Text] Creating material with actual MSDF texture:', {
-              texture,
-              isTexture: texture.isTexture,
-              hasImage: !!texture.image,
-              imageSize: texture.image ? `${texture.image.width}x${texture.image.height}` : 'none'
-            })
             
             const newMaterial = createTextDerivedMaterial(null, {
               texture: texture,
@@ -207,14 +192,11 @@ class Text extends Mesh {
             })
             this._derivedMaterial = newMaterial
             this._materialReady = true
-            
-            console.log('[Text] Material created, ready for rendering')
           } else {
             // Material exists, update uniforms
             const material = Array.isArray(this.material) ? this.material[0] : this.material
             if (material && material.uniforms && material.uniforms.uTroikaSDFTexture) {
               material.uniforms.uTroikaSDFTexture.value = textRenderInfo.sdfTexture
-              console.log('[Text] Updated texture uniform')
             }
             if (material && material.uniforms && material.uniforms.uTroikaIsMSDF) {
               material.uniforms.uTroikaIsMSDF.value = textRenderInfo.isMSDF ? 1 : 0
@@ -223,7 +205,6 @@ class Text extends Mesh {
           
           // Make visible now that we have valid texture and geometry
           this.visible = true
-          console.log('[Text] ✅ Text is ready to render - material, texture, and geometry all valid')
 
           // If we had extra sync requests queued up, kick it off
           const queued = this._queuedSyncs
@@ -268,14 +249,7 @@ class Text extends Mesh {
 
     // This may not always be a text material, e.g. if there's a scene.overrideMaterial present
     if (material.isTroikaTextMaterial) {
-      if (!this._prepareLogged) {
-        console.log('[Text.onBeforeRender] Preparing material for render')
-        this._prepareLogged = true
-      }
       this._prepareForRender(material)
-    } else if (!this._materialWarningLogged) {
-      console.warn('[Text.onBeforeRender] Material is not text material:', material)
-      this._materialWarningLogged = true
     }
   }
 
@@ -355,12 +329,9 @@ class Text extends Mesh {
     const uniforms = material.uniforms
     const textInfo = this.textRenderInfo
     if (textInfo) {
-      const {sdfTexture, blockBounds, isMSDF, distanceRange} = textInfo
+      const {sdfTexture, blockBounds} = textInfo
       
-      // DON'T update texture uniform for TSL materials - texture is baked into shader at compile time
-      // The material was created with the correct texture already
-      
-      // Update size uniforms (these are safe to update)
+      // Update size uniforms
       if (uniforms.uTroikaSDFTextureSize && uniforms.uTroikaSDFTextureSize.value) {
         uniforms.uTroikaSDFTextureSize.value.set(sdfTexture.image.width, sdfTexture.image.height)
       }
@@ -378,8 +349,6 @@ class Text extends Mesh {
       if (uniforms.uTroikaUseGlyphColors) {
         uniforms.uTroikaUseGlyphColors.value = !isOutline && !!textInfo.glyphColors
       }
-      
-      // MSDF flags were set at material creation time and don't need updating
 
       let distanceOffset = 0
       let blurRadius = 0
