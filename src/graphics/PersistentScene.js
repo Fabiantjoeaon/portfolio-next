@@ -123,7 +123,6 @@ export class PersistentScene {
     const material = new THREE.MeshStandardMaterial({
       color: 0xff6b6b,
       metalness: 0.3,
-      roughness: 0.4,
     });
     this.testObject = new THREE.Mesh(geometry, material);
     // Position in world space - centered at origin, slightly elevated

@@ -45,6 +45,8 @@ export class SpheresScene extends BaseScene {
         color: new THREE.Color(palette[i % palette.length]),
         roughness: 0.4,
         metalness: 0.2,
+        transparent: true,
+        opacity: 0.5,
       });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set((i % 3) * 2 - 2, Math.floor(i / 3) * 2 - 2, 0);
