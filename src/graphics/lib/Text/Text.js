@@ -25,6 +25,7 @@ const syncCompleteEvent = { type: 'synccomplete' }
 
 const SYNCABLE_PROPS = [
   'font',
+  'msdfFont',
   'fontSize',
   'fontStyle',
   'fontWeight',
@@ -63,9 +64,13 @@ const COPYABLE_PROPS = SYNCABLE_PROPS.concat(
 class Text extends Mesh {
   constructor() {
     const geometry = new GlyphsGeometry()
-    // Create material immediately
-    const material = createTextDerivedMaterial(null)
-    super(geometry, material)
+    // Don't create material until we have a valid texture
+    // Use null material initially
+    super(geometry, null)
+    
+    // Start invisible until first sync completes with valid texture
+    this.visible = false
+    this._materialReady = false
 
     // === Text layout properties: === //
 
@@ -75,6 +80,7 @@ class Text extends Mesh {
     this.curveRadius = 0
     this.direction = 'auto'
     this.font = null //will use default from TextBuilder
+    this.msdfFont = '/assets/fonts/msdf/kenpixel/kenpixel-msdf.json' // Default MSDF font
     this.unicodeFontsURL = null //defaults to CDN
     this.fontSize = 0.1
     this.fontWeight = 'normal'
@@ -90,8 +96,8 @@ class Text extends Mesh {
 
     // === Presentation properties: === //
 
-    this._baseMaterial = material
-    this._derivedMaterial = material
+    this._baseMaterial = null
+    this._derivedMaterial = null
     this.color = null
     this.colorRanges = null
     this.outlineWidth = 0
@@ -138,6 +144,7 @@ class Text extends Mesh {
         getTextRenderInfo({
           text: this.text,
           font: this.font,
+          msdfFont: this.msdfFont,
           lang: this.lang,
           fontSize: this.fontSize || 0.1,
           fontWeight: this.fontWeight || 'normal',
@@ -170,16 +177,53 @@ class Text extends Mesh {
             textRenderInfo.glyphAtlasIndices,
             textRenderInfo.blockBounds,
             textRenderInfo.chunkedBounds,
-            textRenderInfo.glyphColors
+            textRenderInfo.glyphColors,
+            textRenderInfo.glyphUVs
           )
 
           console.log('[Text] Geometry updated, instanceCount:', this.geometry.instanceCount)
           
-          // Force material to recompile now that attributes exist
-          if (this.material && this.material.dispose) {
-            // Dispose cached program so it recompiles with new attributes
-            this.material.needsUpdate = true
+          // Create material NOW with the real texture
+          if (!this._materialReady) {
+            const texture = textRenderInfo.sdfTexture
+            
+            // Validate texture before creating material
+            if (!texture || !texture.isTexture) {
+              console.error('[Text] Invalid texture received:', texture)
+              return
+            }
+            
+            console.log('[Text] Creating material with actual MSDF texture:', {
+              texture,
+              isTexture: texture.isTexture,
+              hasImage: !!texture.image,
+              imageSize: texture.image ? `${texture.image.width}x${texture.image.height}` : 'none'
+            })
+            
+            const newMaterial = createTextDerivedMaterial(null, {
+              texture: texture,
+              isMSDF: textRenderInfo.isMSDF,
+              distanceRange: textRenderInfo.distanceRange
+            })
+            this._derivedMaterial = newMaterial
+            this._materialReady = true
+            
+            console.log('[Text] Material created, ready for rendering')
+          } else {
+            // Material exists, update uniforms
+            const material = Array.isArray(this.material) ? this.material[0] : this.material
+            if (material && material.uniforms && material.uniforms.uTroikaSDFTexture) {
+              material.uniforms.uTroikaSDFTexture.value = textRenderInfo.sdfTexture
+              console.log('[Text] Updated texture uniform')
+            }
+            if (material && material.uniforms && material.uniforms.uTroikaIsMSDF) {
+              material.uniforms.uTroikaIsMSDF.value = textRenderInfo.isMSDF ? 1 : 0
+            }
           }
+          
+          // Make visible now that we have valid texture and geometry
+          this.visible = true
+          console.log('[Text] ✅ Text is ready to render - material, texture, and geometry all valid')
 
           // If we had extra sync requests queued up, kick it off
           const queued = this._queuedSyncs
@@ -211,6 +255,16 @@ class Text extends Mesh {
    */
   onBeforeRender(renderer, scene, camera, geometry, material, group) {
     this.sync()
+
+    // Don't prepare if material not ready yet or if not visible
+    if (!material || !this.visible || !this._materialReady) {
+      return
+    }
+    
+    // Don't prepare if we don't have valid texture data yet
+    if (!this._textRenderInfo || !this._textRenderInfo.sdfTexture) {
+      return
+    }
 
     // This may not always be a text material, e.g. if there's a scene.overrideMaterial present
     if (material.isTroikaTextMaterial) {
@@ -251,7 +305,8 @@ class Text extends Mesh {
   get material() {
     let derivedMaterial = this._derivedMaterial
     if (!derivedMaterial) {
-      derivedMaterial = this._derivedMaterial = this.createDerivedMaterial(null)
+      // Return null if material not ready yet (waiting for texture)
+      return null
     }
     
     // Handle outline rendering as multi-material
@@ -300,19 +355,31 @@ class Text extends Mesh {
     const uniforms = material.uniforms
     const textInfo = this.textRenderInfo
     if (textInfo) {
-      const {sdfTexture, blockBounds} = textInfo
+      const {sdfTexture, blockBounds, isMSDF, distanceRange} = textInfo
       
-      // Update texture uniform - handle both regular and TSL uniform nodes
-      if (uniforms.uTroikaSDFTexture.value !== sdfTexture) {
-        uniforms.uTroikaSDFTexture.value = sdfTexture
-        console.log('[Text._prepareForRender] Set SDF texture:', sdfTexture)
+      // DON'T update texture uniform for TSL materials - texture is baked into shader at compile time
+      // The material was created with the correct texture already
+      
+      // Update size uniforms (these are safe to update)
+      if (uniforms.uTroikaSDFTextureSize && uniforms.uTroikaSDFTextureSize.value) {
+        uniforms.uTroikaSDFTextureSize.value.set(sdfTexture.image.width, sdfTexture.image.height)
+      }
+      if (uniforms.uTroikaSDFGlyphSize && uniforms.uTroikaSDFGlyphSize.value !== undefined) {
+        uniforms.uTroikaSDFGlyphSize.value = textInfo.sdfGlyphSize
       }
       
-      uniforms.uTroikaSDFTextureSize.value.set(sdfTexture.image.width, sdfTexture.image.height)
-      uniforms.uTroikaSDFGlyphSize.value = textInfo.sdfGlyphSize
-      uniforms.uTroikaSDFExponent.value = textInfo.sdfExponent
-      uniforms.uTroikaTotalBounds.value.fromArray(blockBounds)
-      uniforms.uTroikaUseGlyphColors.value = !isOutline && !!textInfo.glyphColors
+      // Legacy uniforms (not used for MSDF but kept for compatibility)
+      if (uniforms.uTroikaSDFExponent) {
+        uniforms.uTroikaSDFExponent.value = textInfo.sdfExponent
+      }
+      if (uniforms.uTroikaTotalBounds) {
+        uniforms.uTroikaTotalBounds.value.fromArray(blockBounds)
+      }
+      if (uniforms.uTroikaUseGlyphColors) {
+        uniforms.uTroikaUseGlyphColors.value = !isOutline && !!textInfo.glyphColors
+      }
+      
+      // MSDF flags were set at material creation time and don't need updating
 
       let distanceOffset = 0
       let blurRadius = 0
@@ -341,12 +408,23 @@ class Text extends Mesh {
         fillOpacity = this.fillOpacity
       }
 
-      uniforms.uTroikaEdgeOffset.value = distanceOffset
+      // Update effect uniforms
+      if (uniforms.uTroikaEdgeOffset.value !== undefined) {
+        uniforms.uTroikaEdgeOffset.value = distanceOffset
+      }
+      if (uniforms.uTroikaBlurRadius.value !== undefined) {
+        uniforms.uTroikaBlurRadius.value = blurRadius
+      }
+      if (uniforms.uTroikaStrokeWidth.value !== undefined) {
+        uniforms.uTroikaStrokeWidth.value = strokeWidth
+      }
+      if (uniforms.uTroikaStrokeOpacity.value !== undefined) {
+        uniforms.uTroikaStrokeOpacity.value = strokeOpacity || 0
+      }
+      if (uniforms.uTroikaFillOpacity.value !== undefined) {
+        uniforms.uTroikaFillOpacity.value = fillOpacity == null ? 1 : fillOpacity
+      }
       uniforms.uTroikaPositionOffset.value.set(offsetX, offsetY)
-      uniforms.uTroikaBlurRadius.value = blurRadius
-      uniforms.uTroikaStrokeWidth.value = strokeWidth
-      uniforms.uTroikaStrokeOpacity.value = strokeOpacity
-      uniforms.uTroikaFillOpacity.value = fillOpacity == null ? 1 : fillOpacity
       uniforms.uTroikaCurveRadius.value = this.curveRadius || 0
 
       let clipRect = this.clipRect

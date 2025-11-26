@@ -4,6 +4,7 @@ import { fontResolverWorkerModule } from "./FontResolver.js"
 import { createTypesetter } from './Typesetter.js'
 import { generateSDF, generateSDFJS, warmUpSDFCanvas, resizeWebGLCanvasWithoutClearing } from './SDFGenerator.js'
 import bidiFactory from './libs/bidi.factory.js'
+import { loadMSDFFont, loadDefaultMSDFFont, isMSDFFont } from './MSDFLoader.js'
 
 const CONFIG = {
   defaultFontURL: 'https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff', //Roboto Regular
@@ -47,6 +48,12 @@ function getTextRenderInfo(args, callback) {
   const totalStart = now()
 
   console.log('[TextBuilder] getTextRenderInfo called with:', args)
+
+  // Check if this is an MSDF font request
+  if (args.msdfFont || isMSDFFont(args.font)) {
+    console.log('[TextBuilder] MSDF font detected, using MSDF path')
+    return getTextRenderInfoMSDF(args, callback, totalStart)
+  }
 
   // Convert relative URL to absolute and add fallbacks
   const { defaultFontURL } = CONFIG
@@ -332,6 +339,189 @@ const typesetInWorker = defineWorkerModule({
 })
 
 const typesetOnMainThread = typesetInWorker.onMainThread
+
+/**
+ * MSDF-specific text rendering path
+ */
+async function getTextRenderInfoMSDF(args, callback, totalStart) {
+  console.log('[TextBuilder] Processing MSDF font request')
+  
+  try {
+    // Load MSDF font
+    const msdfFontPath = args.msdfFont || args.font
+    const msdfFont = await loadMSDFFont(msdfFontPath)
+    console.log('[TextBuilder] MSDF font loaded:', msdfFont)
+    
+    const { texture, chars, kernings, metrics } = msdfFont
+    
+    // Normalize text to a string
+    const text = '' + args.text
+    
+    // Prepare layout parameters
+    const fontSize = args.fontSize || 0.1
+    const lineHeight = args.lineHeight === 'normal' ? metrics.lineHeight : args.lineHeight
+    const letterSpacing = args.letterSpacing || 0
+    
+    // Simple layout calculation (mimicking Typesetter output for MSDF)
+    const glyphIds = []
+    const glyphPositions = []
+    const glyphBounds = []
+    const glyphAtlasIndices = []
+    const glyphUVs = [] // Store UV coordinates for MSDF
+    
+    let cursorX = 0
+    let cursorY = 0
+    const scale = fontSize / metrics.base
+    
+    // Calculate text bounds
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    
+    for (let i = 0; i < text.length; i++) {
+      const charCode = text.charCodeAt(i)
+      
+      // Handle newline
+      if (charCode === 10) {
+        cursorX = 0
+        cursorY -= lineHeight * scale
+        continue
+      }
+      
+      // Skip carriage return and spaces (spaces advance but don't render)
+      if (charCode === 13) continue
+      if (charCode === 32) {
+        const spaceChar = chars.get(32)
+        if (spaceChar) {
+          cursorX += spaceChar.xadvance * scale
+        }
+        continue
+      }
+      
+      const char = chars.get(charCode)
+      if (!char) {
+        console.warn('[TextBuilder] Character not found in MSDF font:', charCode, String.fromCharCode(charCode))
+        continue
+      }
+      
+      // Calculate glyph bounds in world space
+      const x = cursorX + char.xoffset * scale
+      const y = cursorY - char.yoffset * scale
+      const w = char.width * scale
+      const h = char.height * scale
+      
+      glyphBounds.push(x, y, x + w, y - h)
+      glyphIds.push(charCode)
+      
+      // Store UV coordinates for this glyph in the MSDF atlas
+      // UVs are in normalized texture coordinates (0-1)
+      const uvX = char.x / metrics.scaleW
+      const uvY = char.y / metrics.scaleH
+      const uvW = char.width / metrics.scaleW
+      const uvH = char.height / metrics.scaleH
+      
+      // Store as vec4: (uvX, uvY, uvW, uvH)
+      glyphUVs.push(uvX, uvY, uvW, uvH)
+      
+      // For MSDF, we use a simple sequential index
+      glyphAtlasIndices.push(glyphIds.length - 1)
+      
+      // Update bounds
+      minX = Math.min(minX, x)
+      minY = Math.min(minY, y - h)
+      maxX = Math.max(maxX, x + w)
+      maxY = Math.max(maxY, y)
+      
+      // Advance cursor
+      cursorX += (char.xadvance + letterSpacing) * scale
+      
+      // Apply kerning if available
+      if (i < text.length - 1) {
+        const nextCharCode = text.charCodeAt(i + 1)
+        const firstKernings = kernings.get(charCode)
+        if (firstKernings) {
+          const kern = firstKernings.get(nextCharCode) || 0
+          cursorX += kern * scale
+        }
+      }
+    }
+    
+    // Apply anchors
+    let anchorX = 0
+    let anchorY = 0
+    
+    if (typeof args.anchorX === 'number') {
+      anchorX = args.anchorX
+    } else if (args.anchorX === 'left') {
+      anchorX = minX
+    } else if (args.anchorX === 'center') {
+      anchorX = (minX + maxX) / 2
+    } else if (args.anchorX === 'right') {
+      anchorX = maxX
+    }
+    
+    if (typeof args.anchorY === 'number') {
+      anchorY = args.anchorY
+    } else if (args.anchorY === 'top') {
+      anchorY = maxY
+    } else if (args.anchorY === 'middle') {
+      anchorY = (minY + maxY) / 2
+    } else if (args.anchorY === 'bottom') {
+      anchorY = minY
+    }
+    
+    // Adjust all bounds by anchor
+    for (let i = 0; i < glyphBounds.length; i += 4) {
+      glyphBounds[i] -= anchorX
+      glyphBounds[i + 1] -= anchorY
+      glyphBounds[i + 2] -= anchorX
+      glyphBounds[i + 3] -= anchorY
+    }
+    
+    const blockBounds = [
+      minX - anchorX,
+      minY - anchorY,
+      maxX - anchorX,
+      maxY - anchorY
+    ]
+    
+    console.log('[TextBuilder] MSDF layout complete:', {
+      glyphCount: glyphIds.length,
+      blockBounds,
+      scale
+    })
+    
+    // Invoke callback with MSDF-specific data
+    callback(Object.freeze({
+      parameters: args,
+      sdfTexture: texture,
+      sdfGlyphSize: metrics.scaleW, // Use texture width as glyph size reference
+      sdfExponent: 1, // Not used for MSDF
+      isMSDF: true, // Flag to indicate MSDF mode
+      distanceRange: metrics.distanceRange,
+      glyphBounds: new Float32Array(glyphBounds),
+      glyphAtlasIndices: new Float32Array(glyphAtlasIndices),
+      glyphUVs: new Float32Array(glyphUVs), // MSDF UV coordinates
+      glyphColors: null,
+      caretPositions: null,
+      chunkedBounds: null,
+      ascender: metrics.base * scale,
+      descender: (metrics.base - metrics.lineHeight) * scale,
+      lineHeight: lineHeight * scale,
+      capHeight: metrics.base * scale,
+      xHeight: metrics.base * 0.5 * scale,
+      topBaseline: 0,
+      blockBounds,
+      visibleBounds: blockBounds,
+      timings: {
+        total: now() - totalStart
+      },
+      msdfFont // Keep reference to font for advanced features
+    }))
+    
+  } catch (error) {
+    console.error('[TextBuilder] Error processing MSDF font:', error)
+    throw error
+  }
+}
 
 function dumpSDFTextures() {
   Object.keys(atlases).forEach(size => {

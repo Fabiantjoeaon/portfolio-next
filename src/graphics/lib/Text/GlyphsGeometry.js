@@ -19,6 +19,7 @@ function getTemplateGeometry(detail) {
 const glyphBoundsAttrName = 'aTroikaGlyphBounds'
 const glyphIndexAttrName = 'aTroikaGlyphIndex'
 const glyphColorAttrName = 'aTroikaGlyphColor'
+const glyphUVAttrName = 'aTroikaMSDFUVs'
 
 /**
 @class GlyphsGeometry
@@ -77,6 +78,7 @@ class GlyphsGeometry extends InstancedBufferGeometry {
     this.setAttribute(glyphBoundsAttrName, new InstancedBufferAttribute(new Float32Array(0), 4))
     this.setAttribute(glyphIndexAttrName, new InstancedBufferAttribute(new Float32Array(0), 1))
     this.setAttribute(glyphColorAttrName, new InstancedBufferAttribute(new Uint8Array(0), 3))
+    this.setAttribute(glyphUVAttrName, new InstancedBufferAttribute(new Float32Array(0), 4))
   }
 
   computeBoundingSphere () {
@@ -125,12 +127,14 @@ class GlyphsGeometry extends InstancedBufferGeometry {
    *        consecutive glyphs: `{start:N, end:N, rect:[minX, minY, maxX, maxY]}`. This can be
    *        used with `applyClipRect` to choose an optimized `instanceCount`.
    * @param {Uint8Array} [glyphColors] - An array holding r,g,b values for each glyph.
+   * @param {Float32Array} [glyphUVs] - An array holding UV coordinates for MSDF glyphs (x, y, w, h per glyph).
    */
-  updateGlyphs(glyphBounds, glyphAtlasIndices, blockBounds, chunkedBounds, glyphColors) {
+  updateGlyphs(glyphBounds, glyphAtlasIndices, blockBounds, chunkedBounds, glyphColors, glyphUVs) {
     // Update the instance attributes
     this.updateAttributeData(glyphBoundsAttrName, glyphBounds, 4)
     this.updateAttributeData(glyphIndexAttrName, glyphAtlasIndices, 1)
     this.updateAttributeData(glyphColorAttrName, glyphColors, 3)
+    this.updateAttributeData(glyphUVAttrName, glyphUVs, 4)
     this._blockBounds = blockBounds
     this._chunkedBounds = chunkedBounds
     this.instanceCount = glyphAtlasIndices.length
@@ -230,5 +234,6 @@ export {
   glyphBoundsAttrName,
   glyphColorAttrName,
   glyphIndexAttrName,
+  glyphUVAttrName,
 }
 

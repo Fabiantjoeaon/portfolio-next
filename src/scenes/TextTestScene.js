@@ -72,22 +72,26 @@ export default class TextTestScene extends BaseScene {
       text.anchorY = "middle";
       text.textAlign = "center";
 
+      // Use MSDF font
+      text.msdfFont = "/assets/fonts/msdf/kenpixel/kenpixel-msdf.json";
+
       console.log(
         "[TextTestScene] Text configured at position:",
         text.position
       );
 
-      // Keep text visible for now to debug
-      text.visible = true;
+      // Text will become visible automatically after MSDF loads
+      console.log("[TextTestScene] Text will auto-show after MSDF font loads");
 
-      // Add to scene
-      console.log("[TextTestScene] Adding text to scene");
-      this.scene.add(text);
+      // Store reference but DON'T add to scene until material is ready
       this.textMesh = text;
 
       // Trigger sync to generate geometry
       console.log("[TextTestScene] Calling text.sync()");
       text.sync(() => {
+        // NOW add to scene after everything is ready
+        console.log("[TextTestScene] Sync complete, adding text to scene");
+        this.scene.add(text);
         console.log(
           "✅ [TextTestScene] Text synced successfully!",
           text.textRenderInfo
