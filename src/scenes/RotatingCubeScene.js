@@ -41,7 +41,7 @@ export class RotatingCubeScene extends BaseScene {
     this.rotateX = controls?.rotateX ?? 0.6;
     this.rotateY = controls?.rotateY ?? 0.9;
 
-    this.loadText();
+    //this.loadText();
   }
 
   async loadText() {

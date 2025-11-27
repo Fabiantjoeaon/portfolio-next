@@ -56,7 +56,7 @@ export default class TextTestScene extends BaseScene {
       text.textAlign = "center";
 
       // Use MSDF font
-      text.msdfFont = "/assets/fonts/msdf/kenpixel/kenpixel-msdf.json";
+      text.msdfFont = "/assets/fonts/msdf/KHTeka/KHTekaTRIAL-Medium-msdf.json";
 
       // Store reference but DON'T add to scene until material is ready
       this.textMesh = text;

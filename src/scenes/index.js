@@ -7,9 +7,6 @@ import TextTestScene from "./TextTestScene.js";
 import { SwipeTransition } from "../graphics/transitions/SwipeTransition.js";
 import { FadeTransition } from "../graphics/transitions/FadeTransition.js";
 
-console.log("[scenes/index.js] All scene modules loaded");
-console.log("[scenes/index.js] TextTestScene:", TextTestScene);
-
 // Ordered list of scene entries with default configs for visual distinction
 // You can add more scenes here; each entry may be a class or { Scene, config }
 export const orderedScenes = [

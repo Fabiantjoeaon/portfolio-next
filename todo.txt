@@ -1,5 +1,7 @@
 // DOC: https://threejs.org/docs/#TSL
 
+- scene bg color not working?
+
 - MSDF text
     - https://webgpu.github.io/webgpu-samples/?sample=textRenderingMsdf
     - https://github.com/leochocolat/three-msdf-text-utils?tab=readme-ov-file
