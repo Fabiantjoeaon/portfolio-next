@@ -434,9 +434,13 @@ async function getTextRenderInfoMSDF(args, callback, totalStart) {
       // Skip carriage return (spaces advance cursor but don't create geometry)
       if (charCode === 13) continue;
       if (charCode === 32) {
+        // Handle space - use space char if available, otherwise use a fraction of lineHeight
         const spaceChar = chars.get(32);
         if (spaceChar) {
           cursorX += spaceChar.xadvance * scale;
+        } else {
+          // Fallback: use roughly 1/4 of lineHeight as space width (common approximation)
+          cursorX += metrics.lineHeight * 0.3 * scale;
         }
         continue;
       }
@@ -460,19 +464,27 @@ async function getTextRenderInfoMSDF(args, callback, totalStart) {
       // - yoffset = distance from top of line cell to top of glyph (in font pixels)
       // - xoffset = horizontal offset from cursor to glyph left edge
       //
-      // Glyph top Y = posY + (base - yoffset) * scale
-      // (positive when glyph top is above baseline)
+      // In Y-up coordinate system with baseline at cursorY:
+      // - Characters sit ON the baseline (most of the glyph is above baseline)
+      // - yoffset measures from TOP of cell, so larger yoffset = lower glyph top
+      // - base is where baseline sits from top of cell
+      //
+      // glyphTop = baseline + (base - yoffset) * scale
+      // When yoffset < base: glyph top is ABOVE baseline (normal case for letters)
+      // When yoffset > base: glyph top is BELOW baseline (descenders like 'g', 'y')
       const glyphLeft = posX + char.xoffset * scale;
       const glyphTop = posY + (metrics.base - char.yoffset) * scale;
       const glyphWidth = char.width * scale;
       const glyphHeight = char.height * scale;
       const glyphBottom = glyphTop - glyphHeight;
 
+      // Troika's bounds format: [left, bottom, right, top] = [x1, y1, x2, y2]
+      // where y1 < y2 (bottom < top in Y-up coordinate system)
       glyphBounds.push(
-        glyphLeft,
-        glyphTop,
-        glyphLeft + glyphWidth,
-        glyphBottom
+        glyphLeft, // x1: left edge
+        glyphBottom, // y1: bottom edge (smaller Y)
+        glyphLeft + glyphWidth, // x2: right edge
+        glyphTop // y2: top edge (larger Y)
       );
       glyphIds.push(charCode);
 

@@ -1,4 +1,4 @@
-import { TextureLoader, LinearFilter, LinearSRGBColorSpace } from 'three';
+import { TextureLoader, LinearFilter, LinearSRGBColorSpace } from "three";
 
 /**
  * Cache for loaded MSDF fonts to avoid redundant loading
@@ -8,7 +8,7 @@ const fontCache = new Map();
 /**
  * Default MSDF font path
  */
-const DEFAULT_MSDF_FONT = '/assets/fonts/msdf/kenpixel/kenpixel-msdf.json';
+const DEFAULT_MSDF_FONT = "/assets/fonts/msdf/kenpixel/kenpixel-msdf.json";
 
 /**
  * Load and parse an MSDF font with its texture atlas
@@ -30,7 +30,7 @@ export async function loadMSDFFont(jsonPath) {
     const fontData = await response.json();
 
     // Extract texture path from JSON
-    const basePath = jsonPath.substring(0, jsonPath.lastIndexOf('/') + 1);
+    const basePath = jsonPath.substring(0, jsonPath.lastIndexOf("/") + 1);
     const texturePath = basePath + fontData.pages[0];
 
     // Load the texture atlas
@@ -42,12 +42,12 @@ export async function loadMSDFFont(jsonPath) {
     texture.magFilter = LinearFilter;
     texture.generateMipmaps = false;
     texture.colorSpace = LinearSRGBColorSpace;
-    texture.flipY = false; // Don't flip - BMFont coordinates are from top
+    texture.flipY = true; // Flip to match OpenGL convention (V=0 at bottom)
     texture.needsUpdate = true;
-    
+
     // Ensure texture is fully ready
     if (!texture.image || !texture.image.width || !texture.image.height) {
-      throw new Error('Texture image not loaded properly');
+      throw new Error("Texture image not loaded properly");
     }
 
     // Build character lookup map
@@ -75,7 +75,7 @@ export async function loadMSDFFont(jsonPath) {
       scaleW: common.scaleW,
       scaleH: common.scaleH,
       distanceRange: distanceField?.distanceRange || 4,
-      fieldType: distanceField?.fieldType || 'msdf',
+      fieldType: distanceField?.fieldType || "msdf",
     };
 
     const font = {
@@ -91,7 +91,7 @@ export async function loadMSDFFont(jsonPath) {
 
     return font;
   } catch (error) {
-    console.error('[MSDFLoader] Error loading MSDF font:', jsonPath, error);
+    console.error("[MSDFLoader] Error loading MSDF font:", jsonPath, error);
     throw error;
   }
 }
@@ -111,7 +111,7 @@ export async function loadDefaultMSDFFont() {
  */
 export function isMSDFFont(url) {
   if (!url) return false;
-  return url.endsWith('.json') || url.includes('msdf');
+  return url.endsWith(".json") || url.includes("msdf");
 }
 
 /**
@@ -131,14 +131,14 @@ export function convertMSDFToTroikaFormat(chars, metrics) {
       atlasY: char.y,
       atlasW: char.width,
       atlasH: char.height,
-      
+
       // Glyph metrics (in font units)
       width: char.width,
       height: char.height,
       xoffset: char.xoffset,
       yoffset: char.yoffset,
       xadvance: char.xadvance,
-      
+
       // Normalized UV coordinates for shader
       uvX: char.x / metrics.scaleW,
       uvY: char.y / metrics.scaleH,
@@ -171,4 +171,3 @@ export function getKerning(kernings, first, second) {
 export function clearFontCache() {
   fontCache.clear();
 }
-

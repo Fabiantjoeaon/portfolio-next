@@ -120,11 +120,17 @@ export function createTextDerivedMaterial(baseMaterial, options = {}) {
     const hasMSDFUVs = aTroikaMSDFUVs.z.greaterThan(0.0);
 
     // For MSDF: use the direct UV coordinates from the attribute
-    // Flip V coordinate: positionLocal.y=0 (bottom) should map to uvY+uvH (bottom of glyph)
-    // and positionLocal.y=1 (top) should map to uvY (top of glyph)
+    // With flipY=true, texture is flipped: original V=v is now at V=1-v
+    // After flip: top of glyph at 1-uvY, bottom at 1-(uvY+uvH)
+    // Map: position.y=0 (bottom of geometry) -> 1-(uvY+uvH) (bottom of glyph)
+    //      position.y=1 (top of geometry) -> 1-uvY (top of glyph)
+    // Formula: (1 - uvY - uvH) + position.y * uvH
     const msdfUV = vec2(
       aTroikaMSDFUVs.x.add(positionLocal.x.mul(aTroikaMSDFUVs.z)),
-      aTroikaMSDFUVs.y.add(positionLocal.y.oneMinus().mul(aTroikaMSDFUVs.w))
+      float(1.0)
+        .sub(aTroikaMSDFUVs.y)
+        .sub(aTroikaMSDFUVs.w)
+        .add(positionLocal.y.mul(aTroikaMSDFUVs.w))
     );
 
     // For SDF: calculate atlas UVs from glyph index (existing logic)
@@ -156,7 +162,7 @@ export function createTextDerivedMaterial(baseMaterial, options = {}) {
 
   // Fragment shader: Sample MSDF/SDF texture and calculate alpha
   const fragmentShader = Fn(() => {
-    // Sample the texture at the calculated UV (uTroikaSDFTexture is already a TextureNode)
+    // Sample the texture at the calculated UV
     const texSample = uTroikaSDFTexture.sample(vAtlasUV);
 
     // Calculate distance based on whether it's MSDF or SDF
@@ -171,52 +177,59 @@ export function createTextDerivedMaterial(baseMaterial, options = {}) {
     const minMaxRGB = min(maxRG, b);
     const msdfDist = max(minRG, minMaxRGB);
 
-    // For SDF mode, use the alpha channel or red channel
+    // For SDF mode, use the alpha channel
     const sdfDist = texSample.a;
 
-    // Select distance based on mode
-    let distance = isMSDF.select(msdfDist, sdfDist);
+    // Select distance based on mode (0-1 range, 0.5 = edge)
+    const distance = isMSDF.select(msdfDist, sdfDist);
 
-    // Apply edge offset for outline/stroke effects
-    distance = distance.add(uTroikaEdgeOffset);
+    // Standard MSDF rendering
+    // distance > 0.5 = inside (opaque)
+    // distance < 0.5 = outside (transparent)
+    // distance = 0.5 = edge
 
-    // Calculate adaptive anti-aliasing using fwidth (like Troika)
-    // This calculates the rate of change of UV across the screen
-    // aaDist = length(fwidth(vGlyphUV * vGlyphDimensions)) * 0.5
-    const glyphUVScaled = vGlyphUV.mul(vGlyphDimensions);
-    const aaDist = length(fwidth(glyphUVScaled)).mul(0.5);
-
-    // Convert MSDF distance to signed distance (Troika convention: negative = inside, positive = outside)
-    // MSDF: values > 0.5 are inside, < 0.5 are outside
-    // So (0.5 - distance) gives: negative when inside, positive when outside
-    // Scale by glyph dimensions / distanceRange to get screen-space distance
-    const signedDist = float(0.5).sub(distance);
-    const screenDist = isMSDF.select(
-      signedDist.mul(vGlyphDimensions.x.div(uTroikaDistanceRange)),
-      signedDist.mul(vGlyphDimensions.x)
+    // Calculate screen pixel range for sharp anti-aliasing
+    // fwidth(vAtlasUV) gives the change in UV per screen pixel
+    // We want: how many screen pixels does the distanceRange span?
+    const dUV = fwidth(vAtlasUV);
+    // unitRange = distanceRange / textureSize (in UV units)
+    const unitRange = uTroikaDistanceRange.div(uTroikaSDFTextureSize.x);
+    // screenPxRange = unitRange / dUV (average of x and y)
+    const avgDUV = dUV.x.add(dUV.y).mul(0.5);
+    const screenPxRange = isMSDF.select(
+      max(unitRange.div(max(avgDUV, float(0.0001))), float(1.0)),
+      float(8.0)
     );
 
-    // Calculate edge alpha using smoothstep with adaptive AA
-    // smoothstep(aaDist, -aaDist, screenDist):
-    // - Returns 1 when screenDist <= -aaDist (inside the glyph)
-    // - Returns 0 when screenDist >= aaDist (outside the glyph)
-    const effectiveAA = max(aaDist, uTroikaBlurRadius);
-    let edgeAlpha = smoothstep(effectiveAA, effectiveAA.negate(), screenDist);
+    // Convert distance to screen pixels
+    // (distance - 0.5) is in [−0.5, 0.5] range, multiply by screenPxRange
+    const screenPxDistance = distance.sub(0.5).mul(screenPxRange);
+
+    // Apply edge offset (offset is in normalized units, convert to screen px)
+    const screenPxDistanceOffset = screenPxDistance.add(
+      uTroikaEdgeOffset.mul(screenPxRange)
+    );
+
+    // Calculate alpha with ~1px anti-aliasing
+    // clamp(dist + 0.5, 0, 1) gives smooth transition over 1 screen pixel
+    let edgeAlpha = clamp(
+      screenPxDistanceOffset.add(0.5),
+      float(0.0),
+      float(1.0)
+    );
 
     // Apply fill opacity
     edgeAlpha = edgeAlpha.mul(uTroikaFillOpacity);
 
     // Apply stroke if enabled
-    // Stroke extends outward from the glyph edge, so we subtract stroke width from distance
-    // (making the "inside" region larger)
     const hasStroke = uTroikaStrokeWidth.greaterThan(0.0);
-    const strokeDist = screenDist.sub(
-      uTroikaStrokeWidth.mul(vGlyphDimensions.x)
+    const strokePxDist = screenPxDistanceOffset.add(
+      uTroikaStrokeWidth.mul(screenPxRange)
     );
-    const strokeAlpha = smoothstep(
-      effectiveAA,
-      effectiveAA.negate(),
-      strokeDist
+    const strokeAlpha = clamp(
+      strokePxDist.add(0.5),
+      float(0.0),
+      float(1.0)
     ).mul(uTroikaStrokeOpacity);
 
     // Mix fill and stroke colors
@@ -228,9 +241,8 @@ export function createTextDerivedMaterial(baseMaterial, options = {}) {
 
     const finalAlpha = hasStroke.select(max(edgeAlpha, strokeAlpha), edgeAlpha);
 
-    // Discard fully transparent pixels to prevent depth buffer artifacts (black backgrounds)
-    // This is critical when depthWrite is enabled
-    Discard(finalAlpha.lessThanEqual(0.0));
+    // Discard fully transparent pixels to prevent depth buffer artifacts
+    Discard(finalAlpha.lessThanEqual(0.001));
 
     // Combine color and alpha
     return vec4(finalColor, finalAlpha);
