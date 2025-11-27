@@ -34,6 +34,8 @@ import {
   clamp,
   step,
   length,
+  fwidth,
+  Discard,
 } from "three/tsl";
 import {
   glyphBoundsAttrName,
@@ -100,6 +102,7 @@ export function createTextDerivedMaterial(baseMaterial, options = {}) {
   const vGlyphUV = varying(vec2());
   const vAtlasUV = varying(vec2());
   const vTextureChannel = varying(float());
+  const vGlyphDimensions = varying(vec2()); // For fwidth-based AA calculation
 
   // Vertex shader: transform position and calculate UVs
   const vertexShader = Fn(() => {
@@ -136,10 +139,15 @@ export function createTextDerivedMaterial(baseMaterial, options = {}) {
     // Select UV based on mode
     const finalAtlasUV = hasMSDFUVs.select(msdfUV, sdfUV);
 
+    // Calculate glyph dimensions (width, height) for AA calculation
+    const glyphWidth = glyphMax.x.sub(glyphMin.x);
+    const glyphHeight = glyphMax.y.sub(glyphMin.y);
+
     // Store in varyings
     vGlyphUV.assign(positionLocal.xy);
     vAtlasUV.assign(finalAtlasUV);
     vTextureChannel.assign(mod(aTroikaGlyphIndex, 4.0));
+    vGlyphDimensions.assign(vec2(glyphWidth, glyphHeight));
 
     return transformedPos;
   })();
@@ -172,37 +180,57 @@ export function createTextDerivedMaterial(baseMaterial, options = {}) {
     // Apply edge offset for outline/stroke effects
     distance = distance.add(uTroikaEdgeOffset);
 
-    // Calculate screenspace derivatives for adaptive anti-aliasing
-    // Using a fixed value for now as fwidth might not be available in TSL yet
-    const pixelScale = float(1.0 / 512.0).add(uTroikaBlurRadius);
+    // Calculate adaptive anti-aliasing using fwidth (like Troika)
+    // This calculates the rate of change of UV across the screen
+    // aaDist = length(fwidth(vGlyphUV * vGlyphDimensions)) * 0.5
+    const glyphUVScaled = vGlyphUV.mul(vGlyphDimensions);
+    const aaDist = length(fwidth(glyphUVScaled)).mul(0.5);
 
-    // Apply smoothstep for anti-aliased edges
-    const threshold = float(0.5);
-    let alpha = smoothstep(
-      threshold.sub(pixelScale),
-      threshold.add(pixelScale),
-      distance
+    // Convert MSDF distance to signed distance (Troika convention: negative = inside, positive = outside)
+    // MSDF: values > 0.5 are inside, < 0.5 are outside
+    // So (0.5 - distance) gives: negative when inside, positive when outside
+    // Scale by glyph dimensions / distanceRange to get screen-space distance
+    const signedDist = float(0.5).sub(distance);
+    const screenDist = isMSDF.select(
+      signedDist.mul(vGlyphDimensions.x.div(uTroikaDistanceRange)),
+      signedDist.mul(vGlyphDimensions.x)
     );
 
+    // Calculate edge alpha using smoothstep with adaptive AA
+    // smoothstep(aaDist, -aaDist, screenDist):
+    // - Returns 1 when screenDist <= -aaDist (inside the glyph)
+    // - Returns 0 when screenDist >= aaDist (outside the glyph)
+    const effectiveAA = max(aaDist, uTroikaBlurRadius);
+    let edgeAlpha = smoothstep(effectiveAA, effectiveAA.negate(), screenDist);
+
     // Apply fill opacity
-    alpha = alpha.mul(uTroikaFillOpacity);
+    edgeAlpha = edgeAlpha.mul(uTroikaFillOpacity);
 
     // Apply stroke if enabled
+    // Stroke extends outward from the glyph edge, so we subtract stroke width from distance
+    // (making the "inside" region larger)
     const hasStroke = uTroikaStrokeWidth.greaterThan(0.0);
+    const strokeDist = screenDist.sub(
+      uTroikaStrokeWidth.mul(vGlyphDimensions.x)
+    );
     const strokeAlpha = smoothstep(
-      threshold.sub(pixelScale).sub(uTroikaStrokeWidth),
-      threshold.sub(pixelScale),
-      distance
+      effectiveAA,
+      effectiveAA.negate(),
+      strokeDist
     ).mul(uTroikaStrokeOpacity);
 
     // Mix fill and stroke colors
     const fillColor = vec3(colorUniform);
     const finalColor = hasStroke.select(
-      mix(vec3(uTroikaStrokeColor), fillColor, alpha),
+      mix(vec3(uTroikaStrokeColor), fillColor, edgeAlpha),
       fillColor
     );
 
-    const finalAlpha = hasStroke.select(max(alpha, strokeAlpha), alpha);
+    const finalAlpha = hasStroke.select(max(edgeAlpha, strokeAlpha), edgeAlpha);
+
+    // Discard fully transparent pixels to prevent depth buffer artifacts (black backgrounds)
+    // This is critical when depthWrite is enabled
+    Discard(finalAlpha.lessThanEqual(0.0));
 
     // Combine color and alpha
     return vec4(finalColor, finalAlpha);

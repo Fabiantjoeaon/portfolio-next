@@ -404,14 +404,16 @@ async function getTextRenderInfoMSDF(args, callback, totalStart) {
 
     // Simple layout calculation (mimicking Typesetter output for MSDF)
     const glyphIds = [];
-    const glyphPositions = [];
+    const glyphPositions = []; // (x, y) origin for each glyph
     const glyphBounds = [];
     const glyphAtlasIndices = [];
     const glyphUVs = []; // Store UV coordinates for MSDF
 
     let cursorX = 0;
     let cursorY = 0;
-    const scale = fontSize / metrics.base;
+    // Scale from font pixels to world units
+    // Use lineHeight as the reference to match fontSize
+    const scale = fontSize / metrics.lineHeight;
 
     // Calculate text bounds
     let minX = Infinity,
@@ -429,7 +431,7 @@ async function getTextRenderInfoMSDF(args, callback, totalStart) {
         continue;
       }
 
-      // Skip carriage return and spaces (spaces advance but don't render)
+      // Skip carriage return (spaces advance cursor but don't create geometry)
       if (charCode === 13) continue;
       if (charCode === 32) {
         const spaceChar = chars.get(32);
@@ -444,13 +446,34 @@ async function getTextRenderInfoMSDF(args, callback, totalStart) {
         continue;
       }
 
-      // Calculate glyph bounds in world space
-      const x = cursorX + char.xoffset * scale;
-      const y = cursorY - char.yoffset * scale;
-      const w = char.width * scale;
-      const h = char.height * scale;
+      // Calculate glyph position (origin point like Troika's glyphPositions)
+      // This is the cursor position - glyphs are placed relative to this
+      const posX = cursorX;
+      const posY = cursorY;
 
-      glyphBounds.push(x, y, x + w, y - h);
+      // Store position (x, y) like Troika does
+      glyphPositions.push(posX, posY);
+
+      // Calculate glyph bounds in world space
+      // BMFont positioning:
+      // - base = distance from top of line cell to baseline (in font pixels)
+      // - yoffset = distance from top of line cell to top of glyph (in font pixels)
+      // - xoffset = horizontal offset from cursor to glyph left edge
+      //
+      // Glyph top Y = posY + (base - yoffset) * scale
+      // (positive when glyph top is above baseline)
+      const glyphLeft = posX + char.xoffset * scale;
+      const glyphTop = posY + (metrics.base - char.yoffset) * scale;
+      const glyphWidth = char.width * scale;
+      const glyphHeight = char.height * scale;
+      const glyphBottom = glyphTop - glyphHeight;
+
+      glyphBounds.push(
+        glyphLeft,
+        glyphTop,
+        glyphLeft + glyphWidth,
+        glyphBottom
+      );
       glyphIds.push(charCode);
 
       // Store UV coordinates for this glyph in the MSDF atlas
@@ -467,13 +490,13 @@ async function getTextRenderInfoMSDF(args, callback, totalStart) {
       // For MSDF, we use a simple sequential index
       glyphAtlasIndices.push(glyphIds.length - 1);
 
-      // Update bounds
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y - h);
-      maxX = Math.max(maxX, x + w);
-      maxY = Math.max(maxY, y);
+      // Update total bounds
+      minX = Math.min(minX, glyphLeft);
+      minY = Math.min(minY, glyphBottom);
+      maxX = Math.max(maxX, glyphLeft + glyphWidth);
+      maxY = Math.max(maxY, glyphTop);
 
-      // Advance cursor
+      // Advance cursor by xadvance (the horizontal distance to next glyph origin)
       cursorX += (char.xadvance + letterSpacing) * scale;
 
       // Apply kerning if available
@@ -511,12 +534,16 @@ async function getTextRenderInfoMSDF(args, callback, totalStart) {
       anchorY = minY;
     }
 
-    // Adjust all bounds by anchor
+    // Adjust all bounds and positions by anchor
     for (let i = 0; i < glyphBounds.length; i += 4) {
       glyphBounds[i] -= anchorX;
       glyphBounds[i + 1] -= anchorY;
       glyphBounds[i + 2] -= anchorX;
       glyphBounds[i + 3] -= anchorY;
+    }
+    for (let i = 0; i < glyphPositions.length; i += 2) {
+      glyphPositions[i] -= anchorX;
+      glyphPositions[i + 1] -= anchorY;
     }
 
     const blockBounds = [
@@ -536,6 +563,7 @@ async function getTextRenderInfoMSDF(args, callback, totalStart) {
         isMSDF: true, // Flag to indicate MSDF mode
         distanceRange: metrics.distanceRange,
         glyphBounds: new Float32Array(glyphBounds),
+        glyphPositions: new Float32Array(glyphPositions), // (x, y) origin for each glyph
         glyphAtlasIndices: new Float32Array(glyphAtlasIndices),
         glyphUVs: new Float32Array(glyphUVs), // MSDF UV coordinates
         glyphColors: null,
@@ -546,7 +574,7 @@ async function getTextRenderInfoMSDF(args, callback, totalStart) {
         lineHeight: lineHeight * scale,
         capHeight: metrics.base * scale,
         xHeight: metrics.base * 0.5 * scale,
-        topBaseline: 0,
+        topBaseline: -anchorY,
         blockBounds,
         visibleBounds: blockBounds,
         timings: {

@@ -34,7 +34,7 @@ export default class TextTestScene extends BaseScene {
       new THREE.MeshBasicMaterial({ color: 0xff0000 })
     );
     testCube.position.set(-2, 0, 0); // Move cube to the left
-    //this.scene.add(testCube);
+    this.scene.add(testCube);
     this.testCube = testCube;
 
     // Load text asynchronously
@@ -47,8 +47,9 @@ export default class TextTestScene extends BaseScene {
       const text = new Text();
 
       // Configure text properties
-      text.text = "Hello WebGPU!";
+      text.text = "Hello WebGPU! This is some long text";
       text.fontSize = 0.5; // Smaller font size for testing
+      text.maxWidth = 0.1;
       text.position.set(0, 0, 0); // Center position
       text.color = 0xffffff;
       text.anchorX = "center";
