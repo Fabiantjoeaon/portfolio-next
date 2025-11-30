@@ -1,5 +1,5 @@
 export class TransitionManager {
-  constructor(sceneManager, { idleMs = 1000, transitionMs = 500 } = {}) {
+  constructor(sceneManager, { idleMs = 4000, transitionMs = 1000 } = {}) {
     this.sceneManager = sceneManager;
     this.idleMs = idleMs;
     this.transitionMs = transitionMs;

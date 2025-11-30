@@ -1,4 +1,5 @@
 import * as THREE from "three/webgpu";
+import { Grid } from "./Grid/index.js";
 
 /**
  * Manages objects that persist across all scenes.
@@ -6,14 +7,39 @@ import * as THREE from "three/webgpu";
  * with depth testing to maintain proper occlusion.
  */
 export default class PersistentScene {
-  constructor() {
+  /**
+   * @param {THREE.WebGPURenderer} renderer - WebGPU renderer for compute shaders
+   */
+  constructor(renderer) {
+    this.renderer = renderer;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     this.testObject = null;
     this.gbuffer = null;
+    this.grid = null;
 
     // Add lighting to the persistent scene
     this._setupLighting();
+
+    // Initialize grid
+    this._setupGrid();
+  }
+
+  /**
+   * Setup the GPU-driven grid
+   */
+  _setupGrid() {
+    this.grid = new Grid({
+      tileSize: 0.8,
+      gap: 0.15,
+      cornerRadius: 0.08,
+      color: 0xffffff,
+      opacity: 0.9,
+      renderer: this.renderer,
+      position: new THREE.Vector3(0, 0, -5), // Behind other content
+    });
+
+    this.scene.add(this.grid);
   }
 
   /**
@@ -110,10 +136,33 @@ export default class PersistentScene {
     }
   }
 
-  update(time) {
+  async update(time) {
     if (this.testObject) {
       this.testObject.rotation.x = time * 0.0005;
       this.testObject.rotation.y = time * 0.001;
+    }
+
+    // Update grid compute shader
+    if (this.grid) {
+      await this.grid.update(time);
+    }
+  }
+
+  /**
+   * Get the grid instance for external configuration
+   * @returns {Grid}
+   */
+  getGrid() {
+    return this.grid;
+  }
+
+  /**
+   * Dispose of all resources
+   */
+  dispose() {
+    if (this.grid) {
+      this.grid.dispose();
+      this.grid = null;
     }
   }
 }

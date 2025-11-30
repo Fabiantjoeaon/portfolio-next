@@ -65,8 +65,7 @@ class App {
     this.transitionManager.setSequence(this.sceneIds, this.sceneInstances);
     this.transitionManager.start(performance.now());
 
-    // Add persistent test object
-    this.sceneManager.persistent.addTestObject();
+    // Grid is now automatically set up in PersistentScene
   }
 
   onResize() {

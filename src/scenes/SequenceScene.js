@@ -8,7 +8,7 @@ export default class SequenceScene extends BaseScene {
     this.scene = new THREE.Scene();
 
     this.cameraState = {
-      position: new THREE.Vector3(3, 2, 8),
+      position: new THREE.Vector3(0, 0, 15),
       lookAt: new THREE.Vector3(0, 0, 0),
       fov: 60,
     };

@@ -31,7 +31,10 @@ export class SceneManager {
     // Create shared normal output node for MRT
     this.normalOutputNode = createNormalOutputNode();
 
-    this.persistent = new PersistentScene();
+    this.persistent = new PersistentScene(renderer);
+
+    // Initialize persistent scene gbuffer
+    this.persistent.initGBuffer(width, height, devicePixelRatio, createGBuffer);
 
     this.post = new PostProcessingScene();
   }
@@ -155,7 +158,7 @@ export class SceneManager {
     }
 
     // Render persistent scene to its own gbuffer using shared camera
-    if (!this.persistent.isEmpty()) {
+    if (!this.persistent.isEmpty() && this.persistent.gbuffer) {
       renderer.setRenderTarget(this.persistent.gbuffer.target);
       renderer.setMRT(
         mrt({
