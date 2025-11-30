@@ -1,26 +1,21 @@
-console.log("[scenes/index.js] Loading scene modules...");
-
-import { TestScene } from "./TestScene.js";
-import { RotatingCubeScene } from "./RotatingCubeScene.js";
-import { SpheresScene } from "./SpheresScene.js";
-import TextTestScene from "./TextTestScene.js";
-import { SwipeTransition } from "../graphics/transitions/SwipeTransition.js";
-import { FadeTransition } from "../graphics/transitions/FadeTransition.js";
+import MeadowScene from "./MeadowScene.js";
+import SequenceScene from "./SequenceScene.js";
+// import { SpheresScene } from "./SpheresScene.js";
 
 // Ordered list of scene entries with default configs for visual distinction
 // You can add more scenes here; each entry may be a class or { Scene, config }
 export const orderedScenes = [
   {
-    Scene: TextTestScene,
+    Scene: MeadowScene,
+  },
+  {
+    Scene: SequenceScene,
   },
   // {
   //   Scene: SpheresScene,
   // },
   // {
-  //   Scene: RotatingCubeScene,
-  // },
-  // {
-  //   Scene: TestScene,
+  //   Scene: TextTestScene,
   // },
 ];
 

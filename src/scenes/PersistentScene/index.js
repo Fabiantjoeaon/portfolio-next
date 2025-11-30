@@ -5,7 +5,7 @@ import * as THREE from "three/webgpu";
  * These objects are rendered into their own gbuffer and composited
  * with depth testing to maintain proper occlusion.
  */
-export class PersistentScene {
+export default class PersistentScene {
   constructor() {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
@@ -108,28 +108,6 @@ export class PersistentScene {
         devicePixelRatio
       );
     }
-  }
-
-  /**
-   * Add a test object (rotating cube) to the persistent scene
-   * The object is positioned in world space at origin.
-   */
-  addTestObject() {
-    if (this.testObject) {
-      return; // Already exists
-    }
-
-    const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xff6b6b,
-      metalness: 0.3,
-    });
-    this.testObject = new THREE.Mesh(geometry, material);
-    // Position in world space - centered at origin, slightly elevated
-    this.testObject.position.set(0, 1, 0);
-
-    // Add directly to scene (not to camera)
-    this.scene.add(this.testObject);
   }
 
   update(time) {

@@ -55,7 +55,7 @@ export class TransitionManager {
     this.nextIdx = (this.prevIdx + 1) % this.sceneIds.length;
 
     // Update the active pair to reflect the new prev/next
-    // This also updates the camera target state
+    // This sets up camera transition: fromState = current scene, toState = next scene
     this.sceneManager.setActivePair(
       this.sceneIds[this.prevIdx],
       this.sceneIds[this.nextIdx]
@@ -67,8 +67,8 @@ export class TransitionManager {
     // Reset mix to 0 to display prev (the scene we just transitioned to)
     this.sceneManager.setMix(0);
 
-    // Snap camera to target (complete interpolation)
-    this.sceneManager.updateCameraTransition(1.0);
+    // Camera is at fromState (progress=0), which is the scene we just arrived at
+    this.sceneManager.updateCameraTransition(0);
 
     // Notify SceneManager that we're no longer transitioning
     this.sceneManager.setTransitioning(false);

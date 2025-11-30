@@ -2,7 +2,7 @@ import { mrt, output } from "three/tsl";
 import { PostProcessingScene } from "./PostProcessingScene.js";
 import { createGBuffer, resizeGBuffer } from "./gbuffer.js";
 import { createNormalOutputNode } from "./materials/GBufferMaterial.js";
-import { PersistentScene } from "./PersistentScene.js";
+import PersistentScene from "../scenes/PersistentScene";
 import { CameraController } from "./CameraController.js";
 
 let _nextSceneId = 1;
@@ -32,7 +32,6 @@ export class SceneManager {
     this.normalOutputNode = createNormalOutputNode();
 
     this.persistent = new PersistentScene();
-    this.persistent.initGBuffer(width, height, devicePixelRatio, createGBuffer);
 
     this.post = new PostProcessingScene();
   }
@@ -54,8 +53,7 @@ export class SceneManager {
       this.activePrevId = id;
       // Set initial camera state from first scene
       if (sceneObj.cameraState) {
-        this.cameraController.setTargetState(sceneObj.cameraState);
-        this.cameraController.snapToTarget();
+        this.cameraController.snapToState(sceneObj.cameraState);
       }
     } else if (this.activeNextId === null) this.activeNextId = id;
     return id;
@@ -65,11 +63,14 @@ export class SceneManager {
     this.activePrevId = prevId;
     this.activeNextId = nextId;
 
-    // Update camera target state when changing active scene
+    // Set up camera transition states from prev scene to next scene
     const prevScene = this.scenes.get(prevId);
-    if (prevScene?.cameraState) {
-      this.cameraController.setTargetState(prevScene.cameraState);
-    }
+    const nextScene = this.scenes.get(nextId);
+
+    this.cameraController.setTransitionStates(
+      prevScene?.cameraState,
+      nextScene?.cameraState
+    );
   }
 
   setMix(value) {
@@ -111,6 +112,7 @@ export class SceneManager {
     );
   }
 
+  // TODO: Update?
   render(timeMs) {
     const renderer = this.renderer;
     const prev = this.scenes.get(this.activePrevId);

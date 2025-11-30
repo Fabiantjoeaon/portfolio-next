@@ -1,20 +1,21 @@
 import * as THREE from "three/webgpu";
 
-export class BaseScene {
+import { SwipeTransition } from "../graphics/transitions/SwipeTransition.js";
+
+export default class BaseScene {
   constructor(config = {}) {
     this.name = config.name || "BaseScene";
     this.scene = new THREE.Scene();
 
-    // Define camera state instead of creating a camera instance
-    // Subclasses should override this to define their camera viewpoint
     this.cameraState = {
-      position: new THREE.Vector3(0, 0, 5),
+      position: new THREE.Vector3(0, 0, 25),
       lookAt: new THREE.Vector3(0, 0, 0),
-      fov: 75,
+      fov: 100,
     };
+    this.transition = new SwipeTransition();
   }
 
   update() {
-    // Override in subclasses to update scene content
+    // TODO:
   }
 }

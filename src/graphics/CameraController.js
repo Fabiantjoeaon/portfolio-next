@@ -16,14 +16,14 @@ export class CameraController {
     this.debug = debug;
     this.controls = null;
 
-    // Camera state tracking
-    this.currentState = {
+    // Transition states - fixed reference points for interpolation
+    this.fromState = {
       position: new THREE.Vector3().copy(this.camera.position),
       lookAt: new THREE.Vector3(0, 0, 0),
       fov: this.camera.fov,
     };
 
-    this.targetState = {
+    this.toState = {
       position: new THREE.Vector3().copy(this.camera.position),
       lookAt: new THREE.Vector3(0, 0, 0),
       fov: this.camera.fov,
@@ -34,81 +34,114 @@ export class CameraController {
       this.controls = new OrbitControls(this.camera, renderer.domElement);
       this.controls.enableDamping = true;
       this.controls.dampingFactor = 0.05;
-      this.controls.target.copy(this.currentState.lookAt);
+      this.controls.target.copy(this.fromState.lookAt);
     }
   }
 
   /**
-   * Set the target camera state (from scene configuration)
+   * Set up the transition between two camera states
+   * @param {Object} fromState - Starting camera state { position, lookAt, fov }
+   * @param {Object} toState - Ending camera state { position, lookAt, fov }
+   */
+  setTransitionStates(fromState, toState) {
+    if (fromState) {
+      if (fromState.position) this.fromState.position.copy(fromState.position);
+      if (fromState.lookAt) this.fromState.lookAt.copy(fromState.lookAt);
+      if (fromState.fov !== undefined) this.fromState.fov = fromState.fov;
+    }
+
+    if (toState) {
+      if (toState.position) this.toState.position.copy(toState.position);
+      if (toState.lookAt) this.toState.lookAt.copy(toState.lookAt);
+      if (toState.fov !== undefined) this.toState.fov = toState.fov;
+    }
+
+    console.log("[Camera] Transition set up:", {
+      from: this.fromState.position.toArray(),
+      to: this.toState.position.toArray(),
+    });
+  }
+
+  /**
+   * Snap camera to a state immediately (no interpolation)
    * @param {Object} state - { position: Vector3, lookAt: Vector3, fov: number }
    */
-  setTargetState(state) {
+  snapToState(state) {
     if (state.position) {
-      this.targetState.position.copy(state.position);
+      this.fromState.position.copy(state.position);
+      this.toState.position.copy(state.position);
+      this.camera.position.copy(state.position);
     }
     if (state.lookAt) {
-      this.targetState.lookAt.copy(state.lookAt);
+      this.fromState.lookAt.copy(state.lookAt);
+      this.toState.lookAt.copy(state.lookAt);
+      this.camera.lookAt(state.lookAt);
     }
     if (state.fov !== undefined) {
-      this.targetState.fov = state.fov;
+      this.fromState.fov = state.fov;
+      this.toState.fov = state.fov;
+      this.camera.fov = state.fov;
     }
-  }
-
-  /**
-   * Snap camera to target state immediately (no interpolation)
-   */
-  snapToTarget() {
-    this.currentState.position.copy(this.targetState.position);
-    this.currentState.lookAt.copy(this.targetState.lookAt);
-    this.currentState.fov = this.targetState.fov;
-
-    this.camera.position.copy(this.currentState.position);
-    this.camera.lookAt(this.currentState.lookAt);
-    this.camera.fov = this.currentState.fov;
     this.camera.updateProjectionMatrix();
 
     if (this.controls) {
-      this.controls.target.copy(this.currentState.lookAt);
+      this.controls.target.copy(this.fromState.lookAt);
       this.controls.update();
     }
   }
 
   /**
-   * Update camera state with interpolation
-   * @param {number} transitionProgress - 0 to 1, where 0 is current state and 1 is target state
+   * Update camera state with interpolation between fromState and toState
+   * @param {number} transitionProgress - 0 to 1, where 0 is fromState and 1 is toState
    */
   update(transitionProgress = 0) {
     // If orbit controls are enabled and active, let them control the camera
     if (this.controls && this.debug) {
       this.controls.update();
-      // Update current state to match controls
-      this.currentState.position.copy(this.camera.position);
-      this.currentState.lookAt.copy(this.controls.target);
+      // Update from state to match controls (for when we exit debug mode)
+      this.fromState.position.copy(this.camera.position);
+      this.fromState.lookAt.copy(this.controls.target);
       return;
     }
 
-    // Interpolate between current and target state
+    // Interpolate between from and to state using fixed reference points
     const t = THREE.MathUtils.clamp(transitionProgress, 0, 1);
 
     // Smooth interpolation using easing
     const eased = inOutQuad(t);
 
-    // Interpolate position
-    this.currentState.position.lerp(this.targetState.position, eased);
-    this.camera.position.copy(this.currentState.position);
-
-    // Interpolate lookAt
-    this.currentState.lookAt.lerp(this.targetState.lookAt, eased);
-    this.camera.lookAt(this.currentState.lookAt);
-
-    // Interpolate FOV
-    this.currentState.fov = THREE.MathUtils.lerp(
-      this.currentState.fov,
-      this.targetState.fov,
+    // Interpolate position (from fixed fromState to fixed toState)
+    this.camera.position.lerpVectors(
+      this.fromState.position,
+      this.toState.position,
       eased
     );
-    this.camera.fov = this.currentState.fov;
+
+    // Interpolate lookAt
+    const interpolatedLookAt = new THREE.Vector3().lerpVectors(
+      this.fromState.lookAt,
+      this.toState.lookAt,
+      eased
+    );
+    this.camera.lookAt(interpolatedLookAt);
+
+    // Interpolate FOV
+    this.camera.fov = THREE.MathUtils.lerp(
+      this.fromState.fov,
+      this.toState.fov,
+      eased
+    );
     this.camera.updateProjectionMatrix();
+
+    // Debug: log progress when transitioning (not every frame)
+    if (t > 0 && t < 1) {
+      console.log(
+        "[Camera] Transitioning:",
+        t.toFixed(2),
+        "pos:",
+        this.camera.position.toArray().map((v) => v.toFixed(2))
+      );
+    }
   }
 
   /**
