@@ -13,6 +13,8 @@ export class Grid extends THREE.Group {
    * @param {number} config.tileSize - Size of each tile in world units
    * @param {number} config.gap - Gap between tiles in world units
    * @param {number} config.cornerRadius - Corner radius for rounded rectangles
+   * @param {number} config.depth - Tile depth/thickness (z-axis)
+   * @param {Object} config.bevel - Bevel options { enabled, thickness, size, segments }
    * @param {THREE.Vector3} config.position - Initial position of the grid
    * @param {number} config.color - Base color for tiles
    * @param {number} config.opacity - Base opacity for tiles
@@ -25,6 +27,13 @@ export class Grid extends THREE.Group {
       tileSize: config.tileSize ?? 1.0,
       gap: config.gap ?? 0.1,
       cornerRadius: config.cornerRadius ?? 0.1,
+      depth: config.depth ?? 0.15,
+      bevel: {
+        enabled: config.bevel?.enabled ?? true,
+        thickness: config.bevel?.thickness ?? undefined, // auto-calculated if undefined
+        size: config.bevel?.size ?? undefined,
+        segments: config.bevel?.segments ?? 2,
+      },
       color: config.color ?? 0xffffff,
       opacity: config.opacity ?? 1.0,
       ...config,
@@ -107,10 +116,11 @@ export class Grid extends THREE.Group {
       return;
     }
 
-    const { tileSize, cornerRadius, color, opacity } = this.config;
+    const { tileSize, cornerRadius, depth, bevel, color, opacity } =
+      this.config;
 
     // Create geometry and material
-    this.geometry = createTileGeometry(tileSize, cornerRadius);
+    this.geometry = createTileGeometry(tileSize, cornerRadius, depth, 4, bevel);
     this.material = createTileMaterial({ color, opacity });
 
     // Create instanced mesh
@@ -216,6 +226,24 @@ export class Grid extends THREE.Group {
   }
 
   /**
+   * Set tile depth/thickness
+   * @param {number} depth - New depth value
+   */
+  setDepth(depth) {
+    this.config.depth = depth;
+    this._rebuild();
+  }
+
+  /**
+   * Set bevel options
+   * @param {Object} bevel - { enabled, thickness, size, segments }
+   */
+  setBevel(bevel) {
+    this.config.bevel = { ...this.config.bevel, ...bevel };
+    this._rebuild();
+  }
+
+  /**
    * Set wave animation parameters
    * @param {Object} params - { amplitude, frequency, speed }
    */
@@ -256,6 +284,8 @@ export class Grid extends THREE.Group {
       count: this.count,
       tileSize: this.config.tileSize,
       gap: this.config.gap,
+      depth: this.config.depth,
+      bevel: this.config.bevel,
     };
   }
 
@@ -282,4 +312,3 @@ export class Grid extends THREE.Group {
     this.positionBuffer = null;
   }
 }
-

@@ -33,6 +33,13 @@ export default class PersistentScene {
       tileSize: 0.8,
       gap: 0.15,
       cornerRadius: 0.08,
+      depth: 0.12,
+      bevel: {
+        enabled: true,
+        thickness: 0.02,
+        size: 0.015,
+        segments: 2,
+      },
       color: 0xffffff,
       opacity: 0.9,
       renderer: this.renderer,

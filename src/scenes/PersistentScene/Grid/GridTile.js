@@ -38,15 +38,41 @@ function createRoundedRectShape(width, height, radius) {
 }
 
 /**
- * Creates the geometry for a single tile (rounded rectangle)
+ * Creates the geometry for a single tile (rounded rectangle with depth)
  * @param {number} size - Size of the tile (width = height)
  * @param {number} radius - Corner radius
+ * @param {number} depth - Extrusion depth (z-axis thickness)
  * @param {number} segments - Curve segments for corners
- * @returns {THREE.ShapeGeometry}
+ * @param {Object} bevelOptions - Bevel configuration
+ * @returns {THREE.ExtrudeGeometry}
  */
-export function createTileGeometry(size = 1, radius = 0.1, segments = 4) {
+export function createTileGeometry(
+  size = 1,
+  radius = 0.1,
+  depth = 0.1,
+  segments = 4,
+  bevelOptions = {}
+) {
   const shape = createRoundedRectShape(size, size, radius);
-  const geometry = new THREE.ShapeGeometry(shape, segments);
+
+  const extrudeSettings = {
+    depth: depth,
+    bevelEnabled: bevelOptions.enabled ?? true,
+    bevelThickness: bevelOptions.thickness ?? depth * 0.15,
+    bevelSize: bevelOptions.size ?? depth * 0.1,
+    bevelOffset: bevelOptions.offset ?? 0,
+    bevelSegments: bevelOptions.segments ?? 2,
+    curveSegments: segments,
+  };
+
+  const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+
+  // Center the geometry along z-axis so it extrudes equally front/back
+  geometry.translate(0, 0, -depth / 2);
+
+  // Compute normals for proper lighting
+  geometry.computeVertexNormals();
+
   return geometry;
 }
 

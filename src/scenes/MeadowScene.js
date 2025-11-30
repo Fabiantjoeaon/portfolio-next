@@ -18,14 +18,7 @@ export default class MeadowScene extends BaseScene {
     this.scene.background = new THREE.Color(0x00ff00);
   }
 
-  init() {
-    this.scene.add(
-      new THREE.Mesh(
-        new THREE.BoxGeometry(1, 1, 1),
-        new THREE.MeshBasicMaterial({ color: 0xffff00 })
-      )
-    );
-  }
+  init() {}
 
   update() {
     // TODO:
