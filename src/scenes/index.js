@@ -1,4 +1,4 @@
-import MeadowScene from "./MeadowScene.js";
+import MeadowScene from "./MeadowScene/index.js";
 import SequenceScene from "./SequenceScene.js";
 // import { SpheresScene } from "./SpheresScene.js";
 

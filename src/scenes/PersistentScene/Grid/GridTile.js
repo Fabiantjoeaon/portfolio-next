@@ -86,9 +86,7 @@ export function createTileMaterial(options = {}) {
   const material = new NodeMaterial();
 
   // Uniforms for global control
-  const baseColorUniform = uniform(
-    new THREE.Color(options.color || 0xffffff)
-  );
+  const baseColorUniform = uniform(new THREE.Color(options.color || 0xffffff));
   const opacityUniform = uniform(options.opacity ?? 1.0);
 
   // Instance attributes - these will be set by the InstancedMesh
@@ -124,4 +122,3 @@ export function createTileMaterial(options = {}) {
 
   return material;
 }
-
