@@ -2,6 +2,28 @@
 
 - scene bg color not working?
 
+- prompt from twitter guy for TSL!!
+
+https://www.instagram.com/p/DQ3_7AHiIk2/?img_index=1
+
+- https://x.com/mingjyunhung/status/1995855482171654479 (be sure to credit)
+- https://x.com/Andersonmancini/status/1996162855842746483
+- https://x.com/makio64/status/1996170137901359503
+
+ICE: https://x.com/cmzw_/status/1985719540471488863
+
+https://claude.ai/chat/94a275fc-87a9-47e8-bd13-0036bd9c20a6
+
+
+- volumetrics:
+https://www.reddit.com/r/GraphicsProgramming/comments/1aqj2dc/volumetric_fog_god_rays/
+
+- refraction: https://threejs.org/examples/?q=water#webgpu_refraction
+
+- water https://threejs.org/examples/?q=water#webgpu_water
+- https://discourse.threejs.org/t/make-high-performance-games-with-water-surface-simulations-with-water-bodies/74113/2
+^ find out whats most performant
+
 - MSDF text
     - https://webgpu.github.io/webgpu-samples/?sample=textRenderingMsdf
     - https://github.com/leochocolat/three-msdf-text-utils?tab=readme-ov-file
