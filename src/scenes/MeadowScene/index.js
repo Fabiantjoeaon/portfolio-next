@@ -50,7 +50,7 @@ export default class MeadowScene extends BaseScene {
     this.scene.add(directionalLight);
   }
 
-  update(time) {
+  update(time, delta) {
     // if (this.waterFloor) {
     //   this.waterFloor.update(time);
     // }

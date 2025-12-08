@@ -15,7 +15,7 @@ export default class BaseScene {
     this.transition = new SwipeTransition();
   }
 
-  update() {
+  update(time, delta) {
     // TODO:
   }
 }

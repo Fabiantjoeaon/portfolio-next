@@ -143,7 +143,7 @@ export default class PersistentScene {
     }
   }
 
-  async update(time) {
+  async update(time, delta) {
     if (this.testObject) {
       this.testObject.rotation.x = time * 0.0005;
       this.testObject.rotation.y = time * 0.001;
@@ -151,7 +151,7 @@ export default class PersistentScene {
 
     // Update grid compute shader
     if (this.grid) {
-      await this.grid.update(time);
+      await this.grid.update(time, delta);
     }
   }
 

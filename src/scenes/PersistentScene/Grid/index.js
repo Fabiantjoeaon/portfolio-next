@@ -194,12 +194,13 @@ export class Grid extends THREE.Group {
   /**
    * Update the grid - runs compute shader
    * @param {number} time - Time in milliseconds
+   * @param {number} delta - Time delta in seconds
    */
-  async update(time) {
+  async update(time, delta) {
     if (!this.compute || !this.renderer || this.count <= 0) return;
 
     // Update compute uniforms
-    this.compute.update(time * 0.001); // Convert to seconds
+    this.compute.update(time * 0.001, delta); // Convert to seconds
 
     // Run compute shader
     await this.renderer.computeAsync(this.compute.getComputeNode());

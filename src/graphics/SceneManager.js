@@ -85,9 +85,9 @@ export class SceneManager {
     this.isTransitioning = isTransitioning;
   }
 
-  updateCameraTransition(progress) {
+  updateCameraTransition(progress, delta) {
     // Update camera interpolation based on transition progress
-    this.cameraController.update(progress);
+    this.cameraController.update(progress, delta);
   }
 
   resize({ width, height, devicePixelRatio }) {
@@ -116,22 +116,23 @@ export class SceneManager {
   }
 
   // TODO: Update?
-  render(timeMs) {
+  render(timeMs, delta) {
     const renderer = this.renderer;
     const prev = this.scenes.get(this.activePrevId);
+
     const next = this.scenes.get(this.activeNextId);
 
     // Get the shared camera
     const camera = this.cameraController.camera;
 
-    this.persistent.update(timeMs);
+    this.persistent.update(timeMs, delta);
 
     // Disable autoClear to handle clearing manually per render target
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
 
     // Always update and render the prev scene
-    if (prev?.update) prev.update(timeMs);
+    if (prev?.update) prev.update(timeMs, delta);
     if (prev) {
       renderer.setRenderTarget(prev.gbuffer.target);
       renderer.setMRT(
@@ -140,7 +141,7 @@ export class SceneManager {
           normal: this.normalOutputNode,
         })
       );
-      
+
       // Explicitly clear with scene background color
       if (prev.scene.background) {
         renderer.setClearColor(prev.scene.background, 1);
@@ -148,7 +149,7 @@ export class SceneManager {
         renderer.setClearColor(0x000000, 1);
       }
       renderer.clear();
-      
+
       // No overrideMaterial - use forward rendering with proper materials/lighting
       renderer.render(prev.scene, camera);
       renderer.setMRT(null);
@@ -156,7 +157,7 @@ export class SceneManager {
 
     // Only update and render next scene during transitions
     if (this.isTransitioning && next && next !== prev) {
-      if (next.update) next.update(timeMs);
+      if (next.update) next.update(timeMs, delta);
 
       renderer.setRenderTarget(next.gbuffer.target);
       renderer.setMRT(
@@ -165,7 +166,7 @@ export class SceneManager {
           normal: this.normalOutputNode,
         })
       );
-      
+
       // Explicitly clear with scene background color
       if (next.scene.background) {
         renderer.setClearColor(next.scene.background, 1);

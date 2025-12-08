@@ -1,6 +1,7 @@
 import * as THREE from "three/webgpu";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { inOutQuad } from "../lib/easing.js";
+import { HoverControls } from "./HoverControls.js";
 
 /**
  * Manages a shared camera instance with state interpolation.
@@ -28,6 +29,14 @@ export class CameraController {
       lookAt: new THREE.Vector3(0, 0, 0),
       fov: this.camera.fov,
     };
+
+    // Initialize HoverControls
+    this.hoverControls = new HoverControls({
+      pos: new THREE.Vector3(1, 1, 1), // Adjust intensity as needed
+      rot: new THREE.Vector3(0.1, 0.1, 0), // Adjust intensity as needed
+      smoothTime: 0.3,
+    });
+    // this.lastTime was removed
 
     // Initialize OrbitControls if in debug mode
     if (debug && renderer) {
@@ -93,8 +102,9 @@ export class CameraController {
   /**
    * Update camera state with interpolation between fromState and toState
    * @param {number} transitionProgress - 0 to 1, where 0 is fromState and 1 is toState
+   * @param {number} delta - Time delta in seconds
    */
-  update(transitionProgress = 0) {
+  update(transitionProgress = 0, delta = 0) {
     // If orbit controls are enabled and active, let them control the camera
     if (this.controls && this.debug) {
       this.controls.update();
@@ -132,6 +142,13 @@ export class CameraController {
       eased
     );
     this.camera.updateProjectionMatrix();
+
+    // Apply hover controls (sway)
+    // Only apply hover if not in debug mode (interferes with orbit controls)
+    if (!this.debug || !this.controls) {
+      this.hoverControls.update(delta);
+      this.hoverControls.apply(this.camera);
+    }
 
     // Debug: log progress when transitioning (not every frame)
     if (t > 0 && t < 1) {

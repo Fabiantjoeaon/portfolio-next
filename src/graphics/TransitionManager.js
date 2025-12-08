@@ -68,7 +68,7 @@ export class TransitionManager {
     this.sceneManager.setMix(0);
 
     // Camera is at fromState (progress=0), which is the scene we just arrived at
-    this.sceneManager.updateCameraTransition(0);
+    this.sceneManager.updateCameraTransition(0, 0); // delta 0 on instant snap
 
     // Notify SceneManager that we're no longer transitioning
     this.sceneManager.setTransitioning(false);
@@ -76,14 +76,14 @@ export class TransitionManager {
     this.phase = "idle";
   }
 
-  update(nowMs) {
+  update(nowMs, delta = 0) {
     if (!this.sceneIds.length) return;
 
     const elapsed = nowMs - this.t0;
 
     if (this.phase === "idle") {
       // Update camera controller (for orbit controls in debug mode)
-      this.sceneManager.updateCameraTransition(0);
+      this.sceneManager.updateCameraTransition(0, delta);
 
       // Hold current scene (prev) fully visible at mix=0
       if (elapsed >= this.idleMs) {
@@ -103,7 +103,7 @@ export class TransitionManager {
 
       this.sceneManager.setMix(mix);
       // Update camera interpolation based on transition progress
-      this.sceneManager.updateCameraTransition(mix);
+      this.sceneManager.updateCameraTransition(mix, delta);
 
       if (mix >= 1) {
         this.onTransitionComplete();

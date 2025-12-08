@@ -152,8 +152,9 @@ export class GridCompute {
   /**
    * Update uniforms and prepare for compute dispatch
    * @param {number} time - Current time in seconds
+   * @param {number} delta - Time delta in seconds
    */
-  update(time) {
+  update(time, delta) {
     this.uniforms.time.value = time;
   }
 

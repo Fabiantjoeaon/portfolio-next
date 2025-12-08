@@ -21,6 +21,7 @@ class App {
 
     this.onResize = this.onResize.bind(this);
     this.render = this.render.bind(this);
+    this.lastTime = 0;
   }
 
   async init() {
@@ -93,13 +94,18 @@ class App {
   render(time) {
     if (this.stats) this.stats.begin();
 
+    // Calculate delta time in seconds
+    // time is in milliseconds
+    const delta = (time - this.lastTime) / 1000;
+    this.lastTime = time;
+
     if (this.sceneIds.length === 0) {
       if (this.stats) this.stats.end();
       return;
     }
 
-    this.transitionManager?.update(time);
-    this.sceneManager.render(time);
+    this.transitionManager?.update(time, delta);
+    this.sceneManager.render(time, delta);
     if (this.stats) this.stats.end();
   }
 }
