@@ -46,8 +46,8 @@ export class VATLoader {
   }
 
   /**
-   * Load FBX and extract the first mesh geometry
-   * Also creates a vatIndex attribute for proper VAT lookup
+   * Load FBX and extract ALL mesh geometries, merging them into one
+   * Also creates a vatLookup attribute for proper VAT lookup
    * @param {string} url
    * @returns {Promise<{geometry: THREE.BufferGeometry}>}
    */
@@ -56,21 +56,32 @@ export class VATLoader {
       this.fbxLoader.load(
         url,
         (group) => {
-          let geometry = null;
+          const meshes = [];
 
           group.traverse((child) => {
-            if (child.isMesh && !geometry) {
-              geometry = child.geometry;
+            if (child.isMesh) {
+              console.log(`VAT: Found mesh "${child.name}" with ${child.geometry.attributes.position.count} vertices`);
+              meshes.push(child);
             }
           });
 
-          if (!geometry) {
+          if (meshes.length === 0) {
             reject(new Error("No mesh found in FBX file"));
             return;
           }
 
-          // Create vatIndex attribute based on unique UV1 values
-          // This maps each vertex to its correct VAT texture column
+          console.log(`VAT: Found ${meshes.length} mesh(es) in FBX`);
+
+          let geometry;
+          if (meshes.length === 1) {
+            // Single mesh - use directly
+            geometry = meshes[0].geometry;
+          } else {
+            // Multiple meshes - merge them
+            geometry = this._mergeGeometries(meshes);
+          }
+
+          // Create vatLookup attribute based on UV1 values
           this._createVATIndexAttribute(geometry);
 
           resolve({ geometry });
@@ -82,8 +93,71 @@ export class VATLoader {
   }
 
   /**
+   * Merge multiple mesh geometries into one
+   * @param {THREE.Mesh[]} meshes
+   * @returns {THREE.BufferGeometry}
+   */
+  _mergeGeometries(meshes) {
+    // Collect all geometries with their world transforms
+    const geometries = meshes.map(mesh => {
+      const geo = mesh.geometry.clone();
+      
+      // Apply mesh transform to geometry
+      mesh.updateMatrixWorld(true);
+      geo.applyMatrix4(mesh.matrixWorld);
+      
+      return geo;
+    });
+
+    // Use BufferGeometryUtils to merge
+    const { mergeGeometries } = THREE.BufferGeometryUtils;
+    if (mergeGeometries) {
+      return mergeGeometries(geometries, false);
+    }
+
+    // Fallback: manual merge
+    return this._manualMergeGeometries(geometries);
+  }
+
+  /**
+   * Manually merge geometries if BufferGeometryUtils isn't available
+   * @param {THREE.BufferGeometry[]} geometries
+   * @returns {THREE.BufferGeometry}
+   */
+  _manualMergeGeometries(geometries) {
+    const merged = new THREE.BufferGeometry();
+    
+    // Collect all attribute arrays
+    const positions = [];
+    const normals = [];
+    const uvs = [];
+    const uv1s = [];
+    
+    for (const geo of geometries) {
+      const pos = geo.attributes.position;
+      const norm = geo.attributes.normal;
+      const uv = geo.attributes.uv;
+      const uv1 = geo.attributes.uv1;
+      
+      for (let i = 0; i < pos.count; i++) {
+        positions.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+        if (norm) normals.push(norm.getX(i), norm.getY(i), norm.getZ(i));
+        if (uv) uvs.push(uv.getX(i), uv.getY(i));
+        if (uv1) uv1s.push(uv1.getX(i), uv1.getY(i));
+      }
+    }
+    
+    merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    if (normals.length > 0) merged.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    if (uvs.length > 0) merged.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    if (uv1s.length > 0) merged.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1s, 2));
+    
+    return merged;
+  }
+
+  /**
    * Create a vatLookup attribute that stores the correct U coordinate for VAT sampling
-   * This preserves the original UV1.x coordinates which map to specific texture columns
+   * Uses the original UV1.x coordinates which map to specific texture columns
    * @param {THREE.BufferGeometry} geometry
    */
   _createVATIndexAttribute(geometry) {
@@ -94,13 +168,7 @@ export class VATLoader {
     }
 
     const vertexCount = geometry.attributes.position.count;
-    
-    // The UV1.x values already contain the correct normalized U coordinates
-    // for VAT texture sampling. We just need to copy them to a float attribute.
-    // Multiple vertices may share the same U coordinate (expected for VAT).
     const vatLookup = new Float32Array(vertexCount);
-    
-    // Count unique values for logging
     const uniqueUValues = new Set();
     
     for (let i = 0; i < vertexCount; i++) {
@@ -109,10 +177,10 @@ export class VATLoader {
       uniqueUValues.add(u);
     }
     
-    // Create the vatLookup attribute (stores normalized U coordinate directly)
     geometry.setAttribute('vatLookup', new THREE.BufferAttribute(vatLookup, 1));
+    geometry.userData.vatVertexCount = uniqueUValues.size;
     
-    console.log(`VAT: Created vatLookup attribute with ${uniqueUValues.size} unique U coordinates for ${vertexCount} vertices`);
+    console.log(`VAT: Created vatLookup with ${uniqueUValues.size} unique U coordinates for ${vertexCount} vertices`);
   }
 
   /**

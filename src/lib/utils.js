@@ -4,7 +4,8 @@ export const fullscreenTriangle = () => {
   let geometry = new BufferGeometry();
 
   const vertices = new Float32Array([-1, -1, 3, -1, -1, 3]);
-  const uvs = new Float32Array([0, 0, 2, 0, 0, 2]);
+  // WebGPU has framebuffer origin at top-left (Y-down), so flip V coordinates
+  const uvs = new Float32Array([0, 1, 2, 1, 0, -1]);
 
   geometry.setAttribute("position", new BufferAttribute(vertices, 2));
   geometry.setAttribute("uv", new BufferAttribute(uvs, 2));

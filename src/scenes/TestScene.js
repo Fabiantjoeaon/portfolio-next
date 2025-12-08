@@ -56,78 +56,93 @@ export default class TestScene extends BaseScene {
   _setupGround() {
     const groundGeometry = new THREE.PlaneGeometry(10, 10);
     const groundMaterial = new THREE.MeshStandardNodeMaterial({
-      color: 0xd5d5d5,
+      color: 0xa6a6a6,
       roughness: 0.9,
       metalness: 0.0,
+      //side: THREE.DoubleSide,
     });
 
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = 0;
+
     ground.receiveShadow = true;
     this.scene.add(ground);
   }
 
   async _setupFlower() {
     try {
-      // Load VAT assets (using the non-normal variant to debug)
-      const { geometry, vatTexture, remapInfo } = await vatLoader.load(
+      // Load VAT assets (without normals for now - the working version)
+      const { vatTexture, remapInfo } = await vatLoader.load(
         "/assets/scenes/meadow/flowers/rose_vat/GNRose"
       );
+
+      const textureWidth = vatTexture.image.width;
+      console.log(
+        `VAT: Texture ${textureWidth}x${vatTexture.image.height}, ${remapInfo.frames} frames`
+      );
+
+      // Create geometry sampling the full texture width
+      const fullGeometry = this._createFullVATGeometry(textureWidth);
 
       // Create VAT material
       this.vatMaterial = new VATMaterial({
         vatTexture,
         remapInfo,
-        useNormals: false, // Disable for non-normal VAT
-        color: 0xe85a71,
+        useNormals: false,
+        color: 0x00ff00,
         roughness: 0.5,
         metalness: 0.0,
         side: THREE.DoubleSide,
       });
 
-      // Debug: Texture and mesh info
-      console.log(
-        "VAT Texture dimensions:",
-        vatTexture.image.width,
-        "x",
-        vatTexture.image.height
-      );
-      console.log("Remap info:", remapInfo);
-      console.log("Geometry vertex count:", geometry.attributes.position.count);
+      // Render as point cloud (full rose)
+      const pointsMaterial = new THREE.PointsNodeMaterial({
+        size: 4,
+        sizeAttenuation: true,
+        color: 0xe85a71,
+      });
+      pointsMaterial.positionNode = this.vatMaterial.positionNode;
 
-      // Check vatLookup attribute
-      const vatLookup = geometry.attributes.vatLookup;
-      if (vatLookup) {
-        let minU = Infinity,
-          maxU = -Infinity;
-        const uniqueValues = new Set();
-        for (let i = 0; i < vatLookup.count; i++) {
-          const u = vatLookup.array[i];
-          minU = Math.min(minU, u);
-          maxU = Math.max(maxU, u);
-          uniqueValues.add(u.toFixed(6));
-        }
-        console.log(
-          `vatLookup range: ${minU.toFixed(6)} to ${maxU.toFixed(6)}`
-        );
-        console.log(`vatLookup unique values: ${uniqueValues.size}`);
-        console.log(
-          `This maps to texture columns: ${Math.floor(
-            minU * vatTexture.image.width
-          )} to ${Math.floor(maxU * vatTexture.image.width)}`
-        );
-      }
+      const points = new THREE.Points(fullGeometry, pointsMaterial);
 
-      // Create mesh
-      const flower = new THREE.Mesh(geometry, this.vatMaterial);
-      flower.castShadow = true;
-      flower.receiveShadow = true;
+      // Rotate so flower grows upward from ground (Blender Z-up to Three.js Y-up)
+      points.rotation.x = Math.PI / 2;
+      points.rotation.y = Math.PI; // Flip on Y axis
 
-      this.scene.add(flower);
+      this.scene.add(points);
+      this.pointsMaterial = pointsMaterial;
+
+      console.log(`VAT: Point cloud with ${textureWidth} vertices`);
     } catch (error) {
       console.error("Failed to load VAT flower:", error);
     }
+  }
+
+  /**
+   * Create geometry that samples every column of the VAT texture
+   */
+  _createFullVATGeometry(textureWidth) {
+    const geometry = new THREE.BufferGeometry();
+
+    const positions = new Float32Array(textureWidth * 3);
+    const normals = new Float32Array(textureWidth * 3);
+    const vatLookup = new Float32Array(textureWidth);
+
+    for (let i = 0; i < textureWidth; i++) {
+      positions[i * 3] = 0;
+      positions[i * 3 + 1] = 0;
+      positions[i * 3 + 2] = 0;
+      normals[i * 3] = 0;
+      normals[i * 3 + 1] = 1;
+      normals[i * 3 + 2] = 0;
+      vatLookup[i] = (i + 0.5) / textureWidth;
+    }
+
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+    geometry.setAttribute("vatLookup", new THREE.BufferAttribute(vatLookup, 1));
+
+    return geometry;
   }
 
   _setupTweakpane() {
@@ -147,6 +162,7 @@ export default class TestScene extends BaseScene {
       loop: true,
       interpolate: true,
       useNormals: false,
+      pointSize: 4,
     };
 
     // Time scrubber
@@ -215,6 +231,20 @@ export default class TestScene extends BaseScene {
         this.vatMaterial.setUseNormals(ev.value);
       });
 
+    // Point size control
+    this.vatFolder
+      .addBinding(this.vatControls, "pointSize", {
+        label: "Point Size",
+        min: 1,
+        max: 20,
+        step: 1,
+      })
+      .on("change", (ev) => {
+        if (this.pointsMaterial) {
+          this.pointsMaterial.size = ev.value;
+        }
+      });
+
     // Info display
     this.vatFolder.addBlade({
       view: "text",
@@ -243,7 +273,6 @@ export default class TestScene extends BaseScene {
       // Sync time slider when playing
       if (this.vatControls && this.vatControls.playing) {
         this.vatControls.time = this.vatMaterial.time;
-        // Refresh only the time binding for performance
         if (this.timeBinding) {
           this.timeBinding.refresh();
         }
