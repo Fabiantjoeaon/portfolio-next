@@ -1,10 +1,8 @@
 // DOC: https://threejs.org/docs/#TSL
 
-- scene bg color not working?
-
-- prompt from twitter guy for TSL!!
-
 https://www.instagram.com/p/DQ3_7AHiIk2/?img_index=1
+
+https://x.com/i/bookmarks
 
 - https://x.com/mingjyunhung/status/1995855482171654479 (be sure to credit)
 - https://x.com/Andersonmancini/status/1996162855842746483

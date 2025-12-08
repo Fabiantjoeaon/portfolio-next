@@ -1,7 +1,6 @@
 import BaseScene from "../BaseScene.js";
 import * as THREE from "three/webgpu";
-import { color } from "three/tsl";
-// import { WaterFloor } from "./WaterFloor.js";
+import { WaterMesh } from "three/addons/objects/WaterMesh.js";
 
 export default class MeadowScene extends BaseScene {
   constructor(config = {}) {
@@ -15,31 +14,42 @@ export default class MeadowScene extends BaseScene {
       fov: 80,
     };
 
-    this.waterFloor = null;
+    this.water = null;
 
     this.init();
 
     // Set both background (for clear color) and backgroundNode (for WebGPU rendering)
-    this.scene.background = new THREE.Color(0x00ff00);
-    this.scene.backgroundNode = color(0x00ff00);
+    this.scene.background = new THREE.Color(0xaaaaaa);
   }
 
   init() {
-    // // Create water floor
-    // this.waterFloor = new WaterFloor({
-    //   width: 100,
-    //   height: 100,
-    //   segments: 64,
-    //   positionY: -3,
-    //   waveAmplitude: 0.2,
-    //   waveFrequency: 1.5,
-    //   waveSpeed: 0.8,
-    //   opacity: 0.7,
-    //   reflectionStrength: 0.5,
-    //   waterColor: 0x1a5a7a,
-    // });
+    // Create water plane geometry
+    const waterGeometry = new THREE.PlaneGeometry(200, 200);
 
-    this.scene.add(this.waterFloor);
+    // Load water normals texture
+    const loader = new THREE.TextureLoader();
+    const waterNormals = loader.load(
+      "/assets/textures/waternormals.jpg",
+      (texture) => {
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      }
+    );
+
+    // Create WaterMesh with reflective water effect
+    this.water = new WaterMesh(waterGeometry, {
+      waterNormals,
+      sunDirection: new THREE.Vector3(5, 10, 5).normalize(),
+      sunColor: 0xffffff,
+      waterColor: 0x001e0f,
+      distortionScale: 3.7,
+      alpha: 0.9,
+    });
+
+    // Position behind the persistent grid (which is at z=-5)
+    // this.water.position.z = -6;
+    this.water.position.y = -8;
+    this.water.rotation.x = -Math.PI / 2;
+    this.scene.add(this.water);
 
     // Add basic lighting for the water to be visible
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
@@ -51,8 +61,6 @@ export default class MeadowScene extends BaseScene {
   }
 
   update(time, delta) {
-    // if (this.waterFloor) {
-    //   this.waterFloor.update(time);
-    // }
+    // WaterMesh animates automatically via TSL time node
   }
 }
