@@ -1,5 +1,6 @@
 import * as THREE from "three/webgpu";
 import { Grid } from "./Grid/index.js";
+import { GBuffer } from "../../graphics/GBuffer.js";
 
 /**
  * Manages objects that persist across all scenes.
@@ -9,13 +10,16 @@ import { Grid } from "./Grid/index.js";
 export default class PersistentScene {
   /**
    * @param {THREE.WebGPURenderer} renderer - WebGPU renderer for compute shaders
+   * @param {number} width - Viewport width
+   * @param {number} height - Viewport height
+   * @param {number} devicePixelRatio - Device pixel ratio
    */
-  constructor(renderer) {
+  constructor(renderer, width, height, devicePixelRatio = 1) {
     this.renderer = renderer;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     this.testObject = null;
-    this.gbuffer = null;
+    this.gbuffer = new GBuffer(width, height, devicePixelRatio);
     this.grid = null;
 
     // Add lighting to the persistent scene
@@ -116,33 +120,6 @@ export default class PersistentScene {
     this.camera.updateProjectionMatrix();
   }
 
-  /**
-   * Initialize the gbuffer for persistent scene rendering
-   * @param {number} width - Viewport width
-   * @param {number} height - Viewport height
-   * @param {number} devicePixelRatio - Device pixel ratio
-   */
-  initGBuffer(width, height, devicePixelRatio, createGBuffer) {
-    this.gbuffer = createGBuffer(width, height, devicePixelRatio);
-  }
-
-  /**
-   * Resize the gbuffer
-   * @param {number} width - New viewport width
-   * @param {number} height - New viewport height
-   * @param {number} devicePixelRatio - Device pixel ratio
-   */
-  resizeGBuffer(width, height, devicePixelRatio, resizeGBuffer) {
-    if (this.gbuffer) {
-      this.gbuffer = resizeGBuffer(
-        this.gbuffer,
-        width,
-        height,
-        devicePixelRatio
-      );
-    }
-  }
-
   async update(time, delta) {
     if (this.testObject) {
       this.testObject.rotation.x = time * 0.0005;
@@ -170,6 +147,10 @@ export default class PersistentScene {
     if (this.grid) {
       this.grid.dispose();
       this.grid = null;
+    }
+    if (this.gbuffer) {
+      this.gbuffer.dispose();
+      this.gbuffer = null;
     }
   }
 }

@@ -1,6 +1,6 @@
 import { mrt, output } from "three/tsl";
 import { PostProcessingScene } from "./PostProcessingScene.js";
-import { createGBuffer, resizeGBuffer } from "./gbuffer.js";
+import { GBuffer } from "./GBuffer.js";
 import { createNormalOutputNode } from "./materials/GBufferMaterial.js";
 import PersistentScene from "../scenes/PersistentScene";
 import { CameraController } from "./CameraController.js";
@@ -31,10 +31,12 @@ export class SceneManager {
     // Create shared normal output node for MRT
     this.normalOutputNode = createNormalOutputNode();
 
-    this.persistent = new PersistentScene(renderer);
-
-    // Initialize persistent scene gbuffer
-    this.persistent.initGBuffer(width, height, devicePixelRatio, createGBuffer);
+    this.persistent = new PersistentScene(
+      renderer,
+      width,
+      height,
+      devicePixelRatio
+    );
 
     this.post = new PostProcessingScene();
   }
@@ -43,14 +45,12 @@ export class SceneManager {
     const id = _nextSceneId++;
     const { width, height, devicePixelRatio } = this.viewport;
 
-    const gbuffer = createGBuffer(width, height, devicePixelRatio);
-
     this.scenes.set(id, {
       scene: sceneObj.scene,
       cameraState: sceneObj.cameraState,
       update: sceneObj.update?.bind?.(sceneObj) ?? (() => {}),
       sceneObj,
-      gbuffer,
+      gbuffer: new GBuffer(width, height, devicePixelRatio),
     });
     if (this.activePrevId === null) {
       this.activePrevId = id;
@@ -92,27 +92,17 @@ export class SceneManager {
 
   resize({ width, height, devicePixelRatio }) {
     this.viewport = { width, height, devicePixelRatio };
-    // Recreate all gbuffers
+
+    // Resize all scene gbuffers
     for (const [, entry] of this.scenes) {
-      const resized = resizeGBuffer(
-        entry.gbuffer,
-        width,
-        height,
-        devicePixelRatio
-      );
-      entry.gbuffer = resized;
+      entry.gbuffer.resize(width, height, devicePixelRatio);
     }
 
     // Update shared camera aspect
     this.cameraController.setAspect(width / height);
 
     // Resize persistent gbuffer
-    this.persistent.resizeGBuffer(
-      width,
-      height,
-      devicePixelRatio,
-      resizeGBuffer
-    );
+    this.persistent.gbuffer.resize(width, height, devicePixelRatio);
   }
 
   // TODO: Update?

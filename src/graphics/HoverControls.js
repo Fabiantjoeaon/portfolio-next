@@ -8,7 +8,7 @@ export class HoverControls {
     this.pos = options.pos ?? new THREE.Vector3(0, 0, 0); // Position influence intensity
     this.rot = options.rot ?? new THREE.Vector3(0, 0, 0); // Rotation influence intensity
     this.positiveYOnly = options.positiveYOnly ?? false;
-    this.rate = options.rate ?? 0.1;
+    this.rate = options.rate ?? 0.01;
     this.multiplier = options.multiplier ?? 1.0;
 
     // Internal state for damping

@@ -2,6 +2,7 @@ import * as THREE from "three/webgpu";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { inOutQuad } from "../lib/easing.js";
 import { HoverControls } from "./HoverControls.js";
+import { lerp } from "../lib/math.js";
 
 /**
  * Manages a shared camera instance with state interpolation.
@@ -17,7 +18,8 @@ export class CameraController {
     this.debug = debug;
     this.controls = null;
 
-    // Transition states - fixed reference points for interpolation
+    this.v0 = new THREE.Vector3();
+
     this.fromState = {
       position: new THREE.Vector3().copy(this.camera.position),
       lookAt: new THREE.Vector3(0, 0, 0),
@@ -30,14 +32,11 @@ export class CameraController {
       fov: this.camera.fov,
     };
 
-    // Initialize HoverControls - position sway only for parallax effect
-    // Camera always looks at target, but position shifts create parallax
     this.hoverControls = new HoverControls({
-      pos: new THREE.Vector3(1, 1, 0), // X/Y position sway, no Z
-      rot: new THREE.Vector3(0, 0, 0), // No rotation - camera always looks at target
-      rate: 0.1,
+      pos: new THREE.Vector3(1, 1, 0),
+      rot: new THREE.Vector3(0, 0, 0),
+      rate: 0.05,
     });
-    // this.lastTime was removed
 
     // Initialize OrbitControls if in debug mode
     if (debug && renderer) {
@@ -65,11 +64,6 @@ export class CameraController {
       if (toState.lookAt) this.toState.lookAt.copy(toState.lookAt);
       if (toState.fov !== undefined) this.toState.fov = toState.fov;
     }
-
-    console.log("[Camera] Transition set up:", {
-      from: this.fromState.position.toArray(),
-      to: this.toState.position.toArray(),
-    });
   }
 
   /**
@@ -136,32 +130,15 @@ export class CameraController {
     }
 
     // Interpolate lookAt target
-    const interpolatedLookAt = new THREE.Vector3().lerpVectors(
-      this.fromState.lookAt,
-      this.toState.lookAt,
-      eased
-    );
+    this.v0.lerpVectors(this.fromState.lookAt, this.toState.lookAt, eased);
 
     // Always look at the target - this keeps the camera locked to world center
-    this.camera.lookAt(interpolatedLookAt);
+    this.camera.lookAt(this.v0);
 
     // Interpolate FOV
-    this.camera.fov = THREE.MathUtils.lerp(
-      this.fromState.fov,
-      this.toState.fov,
-      eased
-    );
-    this.camera.updateProjectionMatrix();
 
-    // Debug: log progress when transitioning (not every frame)
-    if (t > 0 && t < 1) {
-      console.log(
-        "[Camera] Transitioning:",
-        t.toFixed(2),
-        "pos:",
-        this.camera.position.toArray().map((v) => v.toFixed(2))
-      );
-    }
+    this.camera.fov = lerp(this.fromState.fov, this.toState.fov, eased);
+    this.camera.updateProjectionMatrix();
   }
 
   /**

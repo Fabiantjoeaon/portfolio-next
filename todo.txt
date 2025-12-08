@@ -12,6 +12,8 @@ https://www.instagram.com/p/DQ3_7AHiIk2/?img_index=1
 
 ICE: https://x.com/cmzw_/status/1985719540471488863
 
+- CODE CLEANUP: less composition in classes, specifically passing of arguments. things should live more on their own or be exposed more easily
+
 https://claude.ai/chat/94a275fc-87a9-47e8-bd13-0036bd9c20a6
 
 

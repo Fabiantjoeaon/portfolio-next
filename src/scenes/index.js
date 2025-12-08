@@ -1,16 +1,21 @@
 import MeadowScene from "./MeadowScene/index.js";
 import SequenceScene from "./SequenceScene.js";
+import TestScene from "./TestScene.js";
 // import { SpheresScene } from "./SpheresScene.js";
 
 // Ordered list of scene entries with default configs for visual distinction
 // You can add more scenes here; each entry may be a class or { Scene, config }
+
 export const orderedScenes = [
   {
-    Scene: MeadowScene,
+    Scene: TestScene,
   },
-  {
-    Scene: SequenceScene,
-  },
+  // {
+  //   Scene: MeadowScene,
+  // },
+  // {
+  //   Scene: SequenceScene,
+  // },
   // {
   //   Scene: SpheresScene,
   // },
