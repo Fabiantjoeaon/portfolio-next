@@ -126,6 +126,10 @@ export class SceneManager {
 
     this.persistent.update(timeMs);
 
+    // Disable autoClear to handle clearing manually per render target
+    const prevAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+
     // Always update and render the prev scene
     if (prev?.update) prev.update(timeMs);
     if (prev) {
@@ -136,6 +140,15 @@ export class SceneManager {
           normal: this.normalOutputNode,
         })
       );
+      
+      // Explicitly clear with scene background color
+      if (prev.scene.background) {
+        renderer.setClearColor(prev.scene.background, 1);
+      } else {
+        renderer.setClearColor(0x000000, 1);
+      }
+      renderer.clear();
+      
       // No overrideMaterial - use forward rendering with proper materials/lighting
       renderer.render(prev.scene, camera);
       renderer.setMRT(null);
@@ -152,6 +165,15 @@ export class SceneManager {
           normal: this.normalOutputNode,
         })
       );
+      
+      // Explicitly clear with scene background color
+      if (next.scene.background) {
+        renderer.setClearColor(next.scene.background, 1);
+      } else {
+        renderer.setClearColor(0x000000, 1);
+      }
+      renderer.clear();
+
       // No overrideMaterial - use forward rendering with proper materials/lighting
       renderer.render(next.scene, camera);
       renderer.setMRT(null);
@@ -166,10 +188,16 @@ export class SceneManager {
           normal: this.normalOutputNode,
         })
       );
+      // Persistent scene uses transparent background
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
       // No overrideMaterial - use forward rendering with proper materials/lighting
       renderer.render(this.persistent.scene, camera);
       renderer.setMRT(null);
     }
+
+    // Restore autoClear
+    renderer.autoClear = prevAutoClear;
 
     // Update post material inputs
     if (prev || next) {

@@ -1,5 +1,6 @@
 import BaseScene from "../BaseScene.js";
 import * as THREE from "three/webgpu";
+import { color } from "three/tsl";
 // import { WaterFloor } from "./WaterFloor.js";
 
 export default class MeadowScene extends BaseScene {
@@ -18,7 +19,9 @@ export default class MeadowScene extends BaseScene {
 
     this.init();
 
+    // Set both background (for clear color) and backgroundNode (for WebGPU rendering)
     this.scene.background = new THREE.Color(0x00ff00);
+    this.scene.backgroundNode = color(0x00ff00);
   }
 
   init() {

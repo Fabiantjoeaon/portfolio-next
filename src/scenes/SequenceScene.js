@@ -1,5 +1,6 @@
 import BaseScene from "./BaseScene";
 import * as THREE from "three/webgpu";
+import { color } from "three/tsl";
 
 export default class SequenceScene extends BaseScene {
   constructor(config = {}) {
@@ -14,10 +15,12 @@ export default class SequenceScene extends BaseScene {
     };
 
     this.init();
+
+    this.scene.background = new THREE.Color(0x0000ff);
+    this.scene.backgroundNode = color(0x0000ff);
   }
 
   init() {
-    this.scene.background = new THREE.Color(0x0000ff);
     this.scene.add(
       new THREE.Mesh(
         new THREE.BoxGeometry(1, 1, 1),

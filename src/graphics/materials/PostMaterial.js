@@ -65,7 +65,10 @@ export class PostProcessingMaterial {
         // Depth test: if persistent is closer (smaller depth), use persistent color
         // step(a, b) returns 1 if b >= a, else 0
         const depthTest = step(persistentDepthSample, blendedDepth);
-        colorNode = mix(colorNode, persistentSample.rgb, depthTest);
+        
+        // Only blend persistent if it passes depth test AND has opacity (not background)
+        // If both are at far plane (depth=1), depthTest=1 but persistent.a=0, so we keep scene color
+        colorNode = mix(colorNode, persistentSample.rgb, depthTest.mul(persistentSample.a));
       }
 
       // Apply optional postprocessing chain after compositing persistent layer
