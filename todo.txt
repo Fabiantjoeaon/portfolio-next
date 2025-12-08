@@ -10,6 +10,8 @@ https://www.instagram.com/p/DQ3_7AHiIk2/?img_index=1
 - https://x.com/Andersonmancini/status/1996162855842746483
 - https://x.com/makio64/status/1996170137901359503
 
+- Loading strategy that also allows workers
+
 ICE: https://x.com/cmzw_/status/1985719540471488863
 
 - CODE CLEANUP: less composition in classes, specifically passing of arguments. things should live more on their own or be exposed more easily
