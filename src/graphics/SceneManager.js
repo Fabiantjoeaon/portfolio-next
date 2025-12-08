@@ -4,12 +4,19 @@ import { GBuffer } from "./GBuffer.js";
 import { createNormalOutputNode } from "./materials/GBufferMaterial.js";
 import PersistentScene from "../scenes/PersistentScene";
 import { CameraController } from "./CameraController.js";
+import { getFlag } from "../lib/query.js";
 
 let _nextSceneId = 1;
 
 export class SceneManager {
-  constructor(renderer, debug = false) {
+  constructor(
+    renderer,
+    debug = false,
+    hidePersistentScene = getFlag("hidePersistentScene")
+  ) {
+    console.log("hidePersistentScene", hidePersistentScene);
     this.renderer = renderer;
+    this.hidePersistentScene = hidePersistentScene;
 
     const { innerWidth: width, innerHeight: height, devicePixelRatio } = window;
     this.viewport = {
@@ -115,7 +122,9 @@ export class SceneManager {
     // Get the shared camera
     const camera = this.cameraController.camera;
 
-    this.persistent.update(timeMs, delta);
+    if (!this.hidePersistentScene) {
+      this.persistent.update(timeMs, delta);
+    }
 
     // Disable autoClear to handle clearing manually per render target
     const prevAutoClear = renderer.autoClear;
@@ -171,7 +180,11 @@ export class SceneManager {
     }
 
     // Render persistent scene to its own gbuffer using shared camera
-    if (!this.persistent.isEmpty() && this.persistent.gbuffer) {
+    if (
+      !this.hidePersistentScene &&
+      !this.persistent.isEmpty() &&
+      this.persistent.gbuffer
+    ) {
       renderer.setRenderTarget(this.persistent.gbuffer.target);
       renderer.setMRT(
         mrt({
@@ -200,8 +213,12 @@ export class SceneManager {
         next: nTex,
         prevDepth: prev?.gbuffer.depth,
         nextDepth: next?.gbuffer.depth,
-        persistent: this.persistent.gbuffer?.albedo,
-        persistentDepth: this.persistent.gbuffer?.depth,
+        persistent: this.hidePersistentScene
+          ? null
+          : this.persistent.gbuffer?.albedo,
+        persistentDepth: this.hidePersistentScene
+          ? null
+          : this.persistent.gbuffer?.depth,
       });
     }
 
