@@ -56,7 +56,7 @@ export default class TestScene extends BaseScene {
   _setupGround() {
     const groundGeometry = new THREE.PlaneGeometry(10, 10);
     const groundMaterial = new THREE.MeshStandardNodeMaterial({
-      color: 0xa6a6a6,
+      color: 0x333333,
       roughness: 0.9,
       metalness: 0.0,
       //side: THREE.DoubleSide,
