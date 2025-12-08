@@ -30,11 +30,12 @@ export class CameraController {
       fov: this.camera.fov,
     };
 
-    // Initialize HoverControls
+    // Initialize HoverControls - position sway only for parallax effect
+    // Camera always looks at target, but position shifts create parallax
     this.hoverControls = new HoverControls({
-      pos: new THREE.Vector3(1, 1, 1), // Adjust intensity as needed
-      rot: new THREE.Vector3(0.1, 0.1, 0), // Adjust intensity as needed
-      smoothTime: 0.3,
+      pos: new THREE.Vector3(1, 1, 0), // X/Y position sway, no Z
+      rot: new THREE.Vector3(0, 0, 0), // No rotation - camera always looks at target
+      rate: 0.1,
     });
     // this.lastTime was removed
 
@@ -127,12 +128,21 @@ export class CameraController {
       eased
     );
 
-    // Interpolate lookAt
+    // Update hover controls
+    if (!this.debug || !this.controls) {
+      this.hoverControls.update(delta);
+      // Apply position sway BEFORE lookAt - creates parallax effect
+      this.camera.position.add(this.hoverControls.currentPosOffset);
+    }
+
+    // Interpolate lookAt target
     const interpolatedLookAt = new THREE.Vector3().lerpVectors(
       this.fromState.lookAt,
       this.toState.lookAt,
       eased
     );
+
+    // Always look at the target - this keeps the camera locked to world center
     this.camera.lookAt(interpolatedLookAt);
 
     // Interpolate FOV
@@ -142,13 +152,6 @@ export class CameraController {
       eased
     );
     this.camera.updateProjectionMatrix();
-
-    // Apply hover controls (sway)
-    // Only apply hover if not in debug mode (interferes with orbit controls)
-    if (!this.debug || !this.controls) {
-      this.hoverControls.update(delta);
-      this.hoverControls.apply(this.camera);
-    }
 
     // Debug: log progress when transitioning (not every frame)
     if (t > 0 && t < 1) {
