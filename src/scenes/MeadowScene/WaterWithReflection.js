@@ -2,9 +2,13 @@ import {
   Color,
   Mesh,
   Vector3,
+  Matrix4,
   MeshLambertNodeMaterial,
   DataTexture,
   RGBAFormat,
+  RenderTarget,
+  HalfFloatType,
+  PerspectiveCamera,
 } from "three/webgpu";
 
 import {
@@ -31,10 +35,16 @@ import {
   mix,
   diffuseColor,
   screenUV,
-  cameraProjectionMatrix,
-  cameraViewMatrix,
-  vec4,
 } from "three/tsl";
+
+// Reflection helpers (similar to ReflectorNode internals)
+const _cameraWorldPosition = new Vector3();
+const _reflectorWorldPosition = new Vector3();
+const _rotationMatrix = new Matrix4();
+const _lookAtPosition = new Vector3(0, 0, -1);
+const _view = new Vector3();
+const _target = new Vector3();
+const _waterNormal = new Vector3(0, 1, 0);
 
 export class WaterWithReflection extends Mesh {
   constructor(geometry, options) {
@@ -46,6 +56,12 @@ export class WaterWithReflection extends Mesh {
 
     this.resolutionScale =
       options.resolutionScale !== undefined ? options.resolutionScale : 0.5;
+
+    // External reflection setup
+    this._renderer = null;
+    this._externalScene = null;
+    this._reflectionTarget = null;
+    this._virtualCamera = new PerspectiveCamera();
 
     // Uniforms
     this.waterNormals = texture(options.waterNormals);
@@ -65,16 +81,17 @@ export class WaterWithReflection extends Mesh {
       )
     );
     this.distortionScale = uniform(
-      options.distortionScale !== undefined ? options.distortionScale : 20.0
+      options.distortionScale !== undefined ? options.distortionScale : 10.0
     );
 
-    // Create a dummy texture initially
+    // Create a dummy texture initially for the external reflection
     this._dummyTexture = new DataTexture(
-      new Uint8Array([0, 0, 0, 255]),
+      new Uint8Array([0, 0, 0, 0]),
       1,
       1,
       RGBAFormat
     );
+    this._dummyTexture.needsUpdate = true;
     this.externalTextureNode = texture(this._dummyTexture);
 
     this.externalStrength = uniform(0.0);
@@ -141,7 +158,7 @@ export class WaterWithReflection extends Mesh {
     material.setupOutgoingLight = () => diffuseColor.rgb;
 
     material.colorNode = Fn(() => {
-      // Reflector for scene reflection
+      // Reflector for scene reflection (this works correctly already)
       const mirrorSampler = reflector();
       const reflectionUV = mirrorSampler.uvNode.add(distortion);
       mirrorSampler.uvNode = reflectionUV;
@@ -169,25 +186,14 @@ export class WaterWithReflection extends Mesh {
         reflectance
       );
 
-      // // For external texture: use the same UV calculation as the reflector
-      // // The reflector already calculates the correct reflection UVs
-      // // We just need to use those same UVs for the external texture
-      // const externalUV = mirrorSampler.uvNode;
+      // External texture is now rendered from a mirrored camera (like reflector)
+      // Use the same UV approach: screenUV with X flipped (matches reflector's _defaultUV)
+      // Plus distortion for water ripples
+      const externalUV = vec2(
+        float(1.0).sub(screenUV.x).add(distortion.x),
+        screenUV.y.add(distortion.y)
+      );
 
-      // // Alternative: if you need to use screen-space coordinates,
-      // // calculate them based on the reflected ray
-      // // const viewDirection = normalize(cameraPosition.sub(positionWorld));
-      // // const reflectedVector = reflect(viewDirection.negate(), surfaceNormal);
-      // //
-      // // // Convert the reflected vector to screen space
-      // // // This assumes the external texture was rendered from the same camera
-      // // const reflectedScreenPos = positionWorld.add(reflectedVector);
-      // // const clipSpace = cameraProjectionMatrix.mul(cameraViewMatrix.mul(vec4(reflectedScreenPos, 1.0)));
-      // // const externalUV = clipSpace.xy.div(clipSpace.w).mul(0.5).add(0.5);
-
-      // const externalColor = this.externalTextureNode.sample(externalUV);
-      // Direct sampling with just distortion
-      const externalUV = screenUV.add(distortion);
       const externalColor = this.externalTextureNode.sample(externalUV);
 
       // Blend based on strength uniform
@@ -201,12 +207,123 @@ export class WaterWithReflection extends Mesh {
     })();
   }
 
-  setExternalReflection(tex) {
-    if (tex) {
-      this.externalTextureNode.value = tex;
-      this.externalStrength.value = this._externalStrengthValue;
-    } else {
-      this.externalStrength.value = 0.0;
+  /**
+   * Set up external scene reflection
+   * @param {THREE.WebGPURenderer} renderer - The renderer
+   * @param {THREE.Scene} externalScene - The scene to reflect (e.g., persistent scene)
+   * @param {number} width - Render target width
+   * @param {number} height - Render target height
+   */
+  setExternalScene(renderer, externalScene, width = 512, height = 512) {
+    this._renderer = renderer;
+    this._externalScene = externalScene;
+
+    // Create reflection render target if needed
+    if (!this._reflectionTarget) {
+      this._reflectionTarget = new RenderTarget(width, height, {
+        type: HalfFloatType,
+        depthBuffer: true,
+      });
+    }
+
+    // Enable external reflection
+    this.externalStrength.value = this._externalStrengthValue;
+  }
+
+  /**
+   * Update the virtual camera for reflection rendering
+   * Mirrors the main camera across the water plane
+   */
+  _updateReflectionCamera(camera) {
+    // Get water world position (this mesh's position)
+    const waterPlaneY = this.getWorldPosition(new Vector3()).y;
+
+    // Copy camera properties
+    this._virtualCamera.copy(camera);
+
+    // Get camera world position
+    _cameraWorldPosition.setFromMatrixPosition(camera.matrixWorld);
+
+    // Set reflector position (a point on the water plane)
+    _reflectorWorldPosition.set(0, waterPlaneY, 0);
+
+    // Calculate view direction
+    _view.subVectors(_reflectorWorldPosition, _cameraWorldPosition);
+
+    // Mirror the view across the water plane
+    _view.reflect(_waterNormal).negate();
+    _view.add(_reflectorWorldPosition);
+
+    // Calculate look-at target
+    _rotationMatrix.extractRotation(camera.matrixWorld);
+    _lookAtPosition.set(0, 0, -1);
+    _lookAtPosition.applyMatrix4(_rotationMatrix);
+    _lookAtPosition.add(_cameraWorldPosition);
+
+    _target.subVectors(_reflectorWorldPosition, _lookAtPosition);
+    _target.reflect(_waterNormal).negate();
+    _target.add(_reflectorWorldPosition);
+
+    // Set up virtual camera
+    this._virtualCamera.position.copy(_view);
+    this._virtualCamera.up.set(0, 1, 0);
+    this._virtualCamera.up.reflect(_waterNormal);
+    this._virtualCamera.lookAt(_target);
+    this._virtualCamera.updateMatrixWorld();
+    this._virtualCamera.projectionMatrix.copy(camera.projectionMatrix);
+  }
+
+  /**
+   * Render the external scene reflection
+   * Call this before the main scene render
+   * @param {THREE.Camera} camera - The main camera
+   */
+  renderExternalReflection(camera) {
+    if (!this._renderer || !this._externalScene || !this._reflectionTarget) {
+      return;
+    }
+
+    // Update virtual camera to mirror main camera
+    this._updateReflectionCamera(camera);
+
+    // Store current state
+    const currentRenderTarget = this._renderer.getRenderTarget();
+    const currentAutoClear = this._renderer.autoClear;
+
+    // Render external scene from mirrored camera
+    this._renderer.setRenderTarget(this._reflectionTarget);
+    this._renderer.autoClear = true;
+    this._renderer.setClearColor(0x000000, 0);
+    this._renderer.clear();
+    this._renderer.render(this._externalScene, this._virtualCamera);
+
+    // Restore state
+    this._renderer.setRenderTarget(currentRenderTarget);
+    this._renderer.autoClear = currentAutoClear;
+
+    // Update texture node with reflection
+    this.externalTextureNode.value = this._reflectionTarget.texture;
+  }
+
+  /**
+   * Resize the reflection render target
+   */
+  resizeReflection(width, height) {
+    if (this._reflectionTarget) {
+      this._reflectionTarget.setSize(width, height);
+    }
+  }
+
+  /**
+   * Dispose resources
+   */
+  dispose() {
+    if (this._reflectionTarget) {
+      this._reflectionTarget.dispose();
+      this._reflectionTarget = null;
+    }
+    if (this._dummyTexture) {
+      this._dummyTexture.dispose();
     }
   }
 }

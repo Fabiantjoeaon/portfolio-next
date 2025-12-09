@@ -117,6 +117,22 @@ export class VATLoader {
         (group) => {
           const meshes = [];
 
+          // Log ALL objects in the FBX to understand the structure
+          console.log("VAT FBX: Full hierarchy:");
+          group.traverse((child) => {
+            const type = child.type;
+            const name = child.name || "(unnamed)";
+            const hasGeo = child.geometry
+              ? `vertices: ${child.geometry.attributes.position?.count}`
+              : "no geometry";
+            const hasMat = child.material
+              ? Array.isArray(child.material)
+                ? `${child.material.length} materials`
+                : "1 material"
+              : "no material";
+            console.log(`  - ${type}: "${name}" | ${hasGeo} | ${hasMat}`);
+          });
+
           group.traverse((child) => {
             if (child.isMesh) {
               const geo = child.geometry;

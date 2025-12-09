@@ -93,18 +93,15 @@ export class GridCompute {
    * Create the TSL compute shader
    */
   _createComputeShader() {
-    const {
-      time,
-      cols,
-      waveAmplitude,
-      waveFrequency,
-      waveSpeed,
-    } = this.uniforms;
+    const { time, cols, waveAmplitude, waveFrequency, waveSpeed } =
+      this.uniforms;
 
     // Storage references for writing
     const offsetStorage = storage(this.offsetBuffer, "vec3", this.count);
     const scaleStorage = storage(this.scaleBuffer, "float", this.count);
     const colorStorage = storage(this.colorBuffer, "vec4", this.count);
+
+    // TODO: Calc in offset buffer beforehand, and on resize
 
     // Compute shader function
     this.computeFn = Fn(() => {
@@ -212,4 +209,3 @@ export class GridCompute {
     };
   }
 }
-

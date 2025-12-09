@@ -26,6 +26,9 @@ ICE: https://x.com/cmzw_/status/1985719540471488863
 
 https://claude.ai/chat/94a275fc-87a9-47e8-bd13-0036bd9c20a6
 
+- POSSIBLE OPTIMISATIONS / SCALE DOWN:
+- use screen space water reflection for water
+
 
 - volumetrics:
 https://www.reddit.com/r/GraphicsProgramming/comments/1aqj2dc/volumetric_fog_god_rays/

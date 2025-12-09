@@ -48,9 +48,9 @@ export default class MeadowScene extends BaseScene {
       waterNormals,
       sunDirection: new THREE.Vector3(5, 10, 5).normalize(),
       sunColor: 0xffffff,
-      waterColor: 0x001e0f,
-      distortionScale: 3.7,
-      alpha: 0.9,
+      waterColor: 0x629eda,
+      distortionScale: 1.7,
+      alpha: 1,
       externalReflectionStrength: 0.7,
     });
 
@@ -69,13 +69,31 @@ export default class MeadowScene extends BaseScene {
   }
 
   /**
-   * Set the persistent scene's gbuffer for use in effects
+   * Set up the persistent scene for water reflections
+   * Called by SceneManager each frame
+   */
+  setPersistentScene(renderer, persistentScene, camera, viewport) {
+    if (!this.water) return;
+
+    // Initialize external scene on first call
+    if (!this._externalSceneInitialized) {
+      const { width, height, devicePixelRatio } = viewport;
+      const w = Math.round(width * devicePixelRatio * 0.5); // Half res for performance
+      const h = Math.round(height * devicePixelRatio * 0.5);
+      this.water.setExternalScene(renderer, persistentScene, w, h);
+      this._externalSceneInitialized = true;
+    }
+
+    // Render the reflection
+    this.water.renderExternalReflection(camera);
+  }
+
+  /**
+   * Legacy: Set the persistent scene's gbuffer
    * @param {GBuffer} gbuffer - The persistent scene's gbuffer
    */
   setPersistentBuffer(gbuffer) {
-    if (this.water) {
-      this.water.setExternalReflection(gbuffer.albedo);
-    }
+    // No longer used for reflections, kept for compatibility
   }
 
   update(time, delta) {

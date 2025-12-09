@@ -148,7 +148,26 @@ export class SceneManager {
       renderer.setMRT(null);
     }
 
-    // Pass persistent gbuffer to scenes that need it (after persistent is rendered)
+    // Pass persistent scene to scenes that need it for reflections
+    // The scene can then render its own reflection pass
+    if (prev?.sceneObj?.setPersistentScene) {
+      prev.sceneObj.setPersistentScene(
+        this.renderer,
+        this.persistent.scene,
+        camera,
+        this.viewport
+      );
+    }
+    if (next?.sceneObj?.setPersistentScene) {
+      next.sceneObj.setPersistentScene(
+        this.renderer,
+        this.persistent.scene,
+        camera,
+        this.viewport
+      );
+    }
+
+    // Legacy: pass gbuffer for scenes that still use it
     if (prev?.sceneObj?.setPersistentBuffer && this.persistent.gbuffer) {
       prev.sceneObj.setPersistentBuffer(this.persistent.gbuffer);
     }

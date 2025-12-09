@@ -17,7 +17,7 @@ export default class PersistentScene {
   constructor(renderer, width, height, devicePixelRatio = 1) {
     this.renderer = renderer;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+    //this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     this.testObject = null;
     this.gbuffer = new GBuffer(width, height, devicePixelRatio);
     this.grid = null;
@@ -101,15 +101,15 @@ export default class PersistentScene {
    * For objects to stay in world space, position them relative to camera.
    * @param {THREE.Camera} sourceCamera - Camera to copy properties from
    */
-  syncCamera(sourceCamera) {
-    this.camera.position.copy(sourceCamera.position);
-    this.camera.quaternion.copy(sourceCamera.quaternion);
-    this.camera.fov = sourceCamera.fov;
-    this.camera.aspect = sourceCamera.aspect;
-    this.camera.near = sourceCamera.near;
-    this.camera.far = sourceCamera.far;
-    this.camera.updateProjectionMatrix();
-  }
+  // syncCamera(sourceCamera) {
+  //   this.camera.position.copy(sourceCamera.position);
+  //   this.camera.quaternion.copy(sourceCamera.quaternion);
+  //   this.camera.fov = sourceCamera.fov;
+  //   this.camera.aspect = sourceCamera.aspect;
+  //   this.camera.near = sourceCamera.near;
+  //   this.camera.far = sourceCamera.far;
+  //   this.camera.updateProjectionMatrix();
+  // }
 
   /**
    * Update the camera aspect ratio
