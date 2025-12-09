@@ -14,7 +14,6 @@ export class SceneManager {
     debug = false,
     hidePersistentScene = getFlag("hidePersistentScene")
   ) {
-    console.log("hidePersistentScene", hidePersistentScene);
     this.renderer = renderer;
     this.hidePersistentScene = hidePersistentScene;
 
@@ -130,6 +129,33 @@ export class SceneManager {
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
 
+    // Render persistent scene FIRST so its gbuffer is available for other scenes
+    if (
+      !this.hidePersistentScene &&
+      !this.persistent.isEmpty() &&
+      this.persistent.gbuffer
+    ) {
+      renderer.setRenderTarget(this.persistent.gbuffer.target);
+      renderer.setMRT(
+        mrt({
+          output,
+          normal: this.normalOutputNode,
+        })
+      );
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
+      renderer.render(this.persistent.scene, camera);
+      renderer.setMRT(null);
+    }
+
+    // Pass persistent gbuffer to scenes that need it (after persistent is rendered)
+    if (prev?.sceneObj?.setPersistentBuffer && this.persistent.gbuffer) {
+      prev.sceneObj.setPersistentBuffer(this.persistent.gbuffer);
+    }
+    if (next?.sceneObj?.setPersistentBuffer && this.persistent.gbuffer) {
+      next.sceneObj.setPersistentBuffer(this.persistent.gbuffer);
+    }
+
     // Always update and render the prev scene
     if (prev?.update) prev.update(timeMs, delta);
     if (prev) {
@@ -176,27 +202,6 @@ export class SceneManager {
 
       // No overrideMaterial - use forward rendering with proper materials/lighting
       renderer.render(next.scene, camera);
-      renderer.setMRT(null);
-    }
-
-    // Render persistent scene to its own gbuffer using shared camera
-    if (
-      !this.hidePersistentScene &&
-      !this.persistent.isEmpty() &&
-      this.persistent.gbuffer
-    ) {
-      renderer.setRenderTarget(this.persistent.gbuffer.target);
-      renderer.setMRT(
-        mrt({
-          output,
-          normal: this.normalOutputNode,
-        })
-      );
-      // Persistent scene uses transparent background
-      renderer.setClearColor(0x000000, 0);
-      renderer.clear();
-      // No overrideMaterial - use forward rendering with proper materials/lighting
-      renderer.render(this.persistent.scene, camera);
       renderer.setMRT(null);
     }
 

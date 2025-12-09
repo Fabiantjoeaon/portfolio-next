@@ -1,6 +1,6 @@
 import BaseScene from "../BaseScene.js";
 import * as THREE from "three/webgpu";
-import { WaterMesh } from "three/addons/objects/WaterMesh.js";
+import { WaterWithReflection } from "./WaterWithReflection.js";
 
 export default class MeadowScene extends BaseScene {
   constructor(config = {}) {
@@ -35,23 +35,31 @@ export default class MeadowScene extends BaseScene {
       }
     );
 
-    // Create WaterMesh with reflective water effect
-    this.water = new WaterMesh(waterGeometry, {
+    this.cube = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 3, 3),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 })
+    );
+    this.cube.position.x = -20;
+    this.cube.position.y = -10;
+    this.scene.add(this.cube);
+
+    // Create custom water with external reflection support
+    this.water = new WaterWithReflection(waterGeometry, {
       waterNormals,
       sunDirection: new THREE.Vector3(5, 10, 5).normalize(),
       sunColor: 0xffffff,
       waterColor: 0x001e0f,
       distortionScale: 3.7,
       alpha: 0.9,
+      externalReflectionStrength: 0.7,
     });
 
-    // Position behind the persistent grid (which is at z=-5)
-    // this.water.position.z = -6;
-    this.water.position.y = -8;
+    // Position as horizontal floor
+    this.water.position.y = -20;
     this.water.rotation.x = -Math.PI / 2;
     this.scene.add(this.water);
 
-    // Add basic lighting for the water to be visible
+    // Add basic lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     this.scene.add(ambientLight);
 
@@ -60,7 +68,18 @@ export default class MeadowScene extends BaseScene {
     this.scene.add(directionalLight);
   }
 
+  /**
+   * Set the persistent scene's gbuffer for use in effects
+   * @param {GBuffer} gbuffer - The persistent scene's gbuffer
+   */
+  setPersistentBuffer(gbuffer) {
+    if (this.water) {
+      this.water.setExternalReflection(gbuffer.albedo);
+    }
+  }
+
   update(time, delta) {
-    // WaterMesh animates automatically via TSL time node
+    // Scene update logic
+    this.cube.position.x = Math.sin(time * 0.001) * 20;
   }
 }
