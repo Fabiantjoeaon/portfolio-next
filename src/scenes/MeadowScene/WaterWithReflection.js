@@ -45,6 +45,7 @@ const _lookAtPosition = new Vector3(0, 0, -1);
 const _view = new Vector3();
 const _target = new Vector3();
 const _waterNormal = new Vector3(0, 1, 0);
+const _tempVec = new Vector3();
 
 export class WaterWithReflection extends Mesh {
   constructor(geometry, options) {
@@ -102,7 +103,7 @@ export class WaterWithReflection extends Mesh {
 
     // TSL
     const getNoise = Fn(([uv]) => {
-      const offset = time;
+      const offset = time.mul(0.3);
 
       const uv0 = add(
         div(uv, 103),
@@ -233,24 +234,23 @@ export class WaterWithReflection extends Mesh {
   /**
    * Update the virtual camera for reflection rendering
    * Mirrors the main camera across the water plane
+   * Based on ReflectorNode's approach
    */
   _updateReflectionCamera(camera) {
-    // Get water world position (this mesh's position)
-    const waterPlaneY = this.getWorldPosition(new Vector3()).y;
+    // Get water world position
+    this.getWorldPosition(_tempVec);
+    const waterPlaneY = _tempVec.y;
 
-    // Copy camera properties
-    this._virtualCamera.copy(camera);
+    // Set reflector position (point on water plane)
+    _reflectorWorldPosition.set(0, waterPlaneY, 0);
 
     // Get camera world position
     _cameraWorldPosition.setFromMatrixPosition(camera.matrixWorld);
 
-    // Set reflector position (a point on the water plane)
-    _reflectorWorldPosition.set(0, waterPlaneY, 0);
-
-    // Calculate view direction
+    // Calculate view vector from camera to reflector
     _view.subVectors(_reflectorWorldPosition, _cameraWorldPosition);
 
-    // Mirror the view across the water plane
+    // Mirror the view across the water plane and get virtual camera position
     _view.reflect(_waterNormal).negate();
     _view.add(_reflectorWorldPosition);
 
@@ -260,17 +260,25 @@ export class WaterWithReflection extends Mesh {
     _lookAtPosition.applyMatrix4(_rotationMatrix);
     _lookAtPosition.add(_cameraWorldPosition);
 
+    // Mirror the target across the water plane
     _target.subVectors(_reflectorWorldPosition, _lookAtPosition);
     _target.reflect(_waterNormal).negate();
     _target.add(_reflectorWorldPosition);
 
-    // Set up virtual camera
+    // Set up virtual camera position and orientation
     this._virtualCamera.position.copy(_view);
     this._virtualCamera.up.set(0, 1, 0);
+    this._virtualCamera.up.applyMatrix4(_rotationMatrix);
     this._virtualCamera.up.reflect(_waterNormal);
     this._virtualCamera.lookAt(_target);
+
+    // Copy camera properties with adjusted near plane for reflections
+    this._virtualCamera.near = 0.01; // Very small near plane to avoid clipping
+    this._virtualCamera.far = camera.far;
+    this._virtualCamera.fov = camera.fov;
+    this._virtualCamera.aspect = camera.aspect;
+    this._virtualCamera.updateProjectionMatrix();
     this._virtualCamera.updateMatrixWorld();
-    this._virtualCamera.projectionMatrix.copy(camera.projectionMatrix);
   }
 
   /**
@@ -283,8 +291,16 @@ export class WaterWithReflection extends Mesh {
       return;
     }
 
-    // Update virtual camera to mirror main camera
     this._updateReflectionCamera(camera);
+
+    // Disable frustum culling for mirrored camera render
+    const cullingStates = [];
+    this._externalScene.traverse((obj) => {
+      if (obj.isMesh || obj.isLine || obj.isPoints) {
+        cullingStates.push({ obj, frustumCulled: obj.frustumCulled });
+        obj.frustumCulled = false;
+      }
+    });
 
     // Store current state
     const currentRenderTarget = this._renderer.getRenderTarget();
@@ -300,6 +316,11 @@ export class WaterWithReflection extends Mesh {
     // Restore state
     this._renderer.setRenderTarget(currentRenderTarget);
     this._renderer.autoClear = currentAutoClear;
+
+    // Restore frustum culling states
+    for (const state of cullingStates) {
+      state.obj.frustumCulled = state.frustumCulled;
+    }
 
     // Update texture node with reflection
     this.externalTextureNode.value = this._reflectionTarget.texture;

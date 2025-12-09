@@ -55,7 +55,7 @@ export default class MeadowScene extends BaseScene {
     });
 
     // Position as horizontal floor
-    this.water.position.y = -20;
+    this.water.position.y = -6;
     this.water.rotation.x = -Math.PI / 2;
     this.scene.add(this.water);
 
@@ -68,32 +68,18 @@ export default class MeadowScene extends BaseScene {
     this.scene.add(directionalLight);
   }
 
-  /**
-   * Set up the persistent scene for water reflections
-   * Called by SceneManager each frame
-   */
   setPersistentScene(renderer, persistentScene, camera, viewport) {
-    if (!this.water) return;
+    if (!this.water || !persistentScene?.children.length) return;
 
-    // Initialize external scene on first call
     if (!this._externalSceneInitialized) {
       const { width, height, devicePixelRatio } = viewport;
-      const w = Math.round(width * devicePixelRatio * 0.5); // Half res for performance
+      const w = Math.round(width * devicePixelRatio * 0.5);
       const h = Math.round(height * devicePixelRatio * 0.5);
       this.water.setExternalScene(renderer, persistentScene, w, h);
       this._externalSceneInitialized = true;
     }
 
-    // Render the reflection
     this.water.renderExternalReflection(camera);
-  }
-
-  /**
-   * Legacy: Set the persistent scene's gbuffer
-   * @param {GBuffer} gbuffer - The persistent scene's gbuffer
-   */
-  setPersistentBuffer(gbuffer) {
-    // No longer used for reflections, kept for compatibility
   }
 
   update(time, delta) {
