@@ -14,13 +14,11 @@ import {
   div,
   normalize,
   positionWorld,
-  positionLocal,
   sub,
   time,
   texture,
   vec2,
   vec3,
-  vec4,
   max,
   dot,
   reflect,
@@ -32,16 +30,12 @@ import {
   mul,
   mix,
   diffuseColor,
-  modelViewMatrix,
+  screenUV,
   cameraProjectionMatrix,
+  cameraViewMatrix,
+  vec4,
 } from "three/tsl";
 
-/**
- * Extended WaterMesh that can reflect both its own scene AND an external texture
- * (like a persistent scene's gbuffer).
- *
- * Based on three.js WaterMesh from three/addons/objects/WaterMesh.js
- */
 export class WaterWithReflection extends Mesh {
   constructor(geometry, options) {
     const material = new MeshLambertNodeMaterial();
@@ -54,36 +48,35 @@ export class WaterWithReflection extends Mesh {
       options.resolutionScale !== undefined ? options.resolutionScale : 0.5;
 
     // Uniforms
-
     this.waterNormals = texture(options.waterNormals);
-
     this.alpha = uniform(options.alpha !== undefined ? options.alpha : 1.0);
-
     this.size = uniform(options.size !== undefined ? options.size : 1.0);
-
     this.sunColor = uniform(
       new Color(options.sunColor !== undefined ? options.sunColor : 0xffffff)
     );
-
     this.sunDirection = uniform(
       options.sunDirection !== undefined
         ? options.sunDirection
         : new Vector3(0.70707, 0.70707, 0.0)
     );
-
     this.waterColor = uniform(
       new Color(
         options.waterColor !== undefined ? options.waterColor : 0x7f7f7f
       )
     );
-
     this.distortionScale = uniform(
       options.distortionScale !== undefined ? options.distortionScale : 20.0
     );
 
-    this.externalTextureNode = texture(this._externalTextureRef);
+    // Create a dummy texture initially
+    this._dummyTexture = new DataTexture(
+      new Uint8Array([0, 0, 0, 255]),
+      1,
+      1,
+      RGBAFormat
+    );
+    this.externalTextureNode = texture(this._dummyTexture);
 
-    // Strength uniform - set to 0 initially (no external reflection until texture is set)
     this.externalStrength = uniform(0.0);
     this._externalStrengthValue =
       options.externalReflectionStrength !== undefined
@@ -91,7 +84,6 @@ export class WaterWithReflection extends Mesh {
         : 0.5;
 
     // TSL
-
     const getNoise = Fn(([uv]) => {
       const offset = time;
 
@@ -143,17 +135,13 @@ export class WaterWithReflection extends Mesh {
       .mul(this.distortionScale);
 
     // Material
-
     material.transparent = true;
-
     material.opacityNode = this.alpha;
-
     material.receivedShadowPositionNode = positionWorld.add(distortion);
-
-    material.setupOutgoingLight = () => diffuseColor.rgb; // backwards compatibility
+    material.setupOutgoingLight = () => diffuseColor.rgb;
 
     material.colorNode = Fn(() => {
-      // Reflector creates proper planar reflection UVs
+      // Reflector for scene reflection
       const mirrorSampler = reflector();
       const reflectionUV = mirrorSampler.uvNode.add(distortion);
       mirrorSampler.uvNode = reflectionUV;
@@ -171,7 +159,7 @@ export class WaterWithReflection extends Mesh {
         this.waterColor
       );
 
-      // Base albedo calculation (same as WaterMesh)
+      // Base albedo calculation
       let albedo = mix(
         this.sunColor.mul(diffuseLight).mul(0.3).add(scatter),
         mirrorSampler.rgb
@@ -181,24 +169,28 @@ export class WaterWithReflection extends Mesh {
         reflectance
       );
 
-      // Blend external texture (persistent gbuffer) using screen-space reflection
-      // Compute the water fragment's actual screen position via projection
-      const viewPos = modelViewMatrix.mul(vec4(positionLocal, 1.0));
-      const clipPos = cameraProjectionMatrix.mul(viewPos);
-      const ndcX = clipPos.x.div(clipPos.w);
-      const ndcY = clipPos.y.div(clipPos.w);
+      // // For external texture: use the same UV calculation as the reflector
+      // // The reflector already calculates the correct reflection UVs
+      // // We just need to use those same UVs for the external texture
+      // const externalUV = mirrorSampler.uvNode;
 
-      // Convert NDC (-1 to 1) to UV (0 to 1) with Y flipped for reflection
-      // The reflection shows what's above the water, which in screen space means
-      // sampling from the upper part of the screen when we're looking at water below
-      const externalUV = vec2(
-        ndcX.mul(0.5).add(0.5).add(distortion.x),
-        ndcY.negate().mul(0.5).add(0.5).add(distortion.y)
-      );
+      // // Alternative: if you need to use screen-space coordinates,
+      // // calculate them based on the reflected ray
+      // // const viewDirection = normalize(cameraPosition.sub(positionWorld));
+      // // const reflectedVector = reflect(viewDirection.negate(), surfaceNormal);
+      // //
+      // // // Convert the reflected vector to screen space
+      // // // This assumes the external texture was rendered from the same camera
+      // // const reflectedScreenPos = positionWorld.add(reflectedVector);
+      // // const clipSpace = cameraProjectionMatrix.mul(cameraViewMatrix.mul(vec4(reflectedScreenPos, 1.0)));
+      // // const externalUV = clipSpace.xy.div(clipSpace.w).mul(0.5).add(0.5);
 
+      // const externalColor = this.externalTextureNode.sample(externalUV);
+      // Direct sampling with just distortion
+      const externalUV = screenUV.add(distortion);
       const externalColor = this.externalTextureNode.sample(externalUV);
 
-      // Blend based on strength uniform (ignore alpha for now to debug)
+      // Blend based on strength uniform
       albedo = mix(
         albedo,
         externalColor.rgb.add(albedo.mul(0.3)),
@@ -209,23 +201,11 @@ export class WaterWithReflection extends Mesh {
     })();
   }
 
-  /**
-   * Set the external reflection texture (e.g., persistent scene's albedo)
-   * @param {THREE.Texture} tex
-   */
   setExternalReflection(tex) {
     if (tex) {
-      // Update the texture node's source texture
-      // TextureNode stores the texture in .value for uniform-like access
       this.externalTextureNode.value = tex;
-      // Also try updating the source directly if value doesn't work
-      if (this.externalTextureNode.source) {
-        this.externalTextureNode.source.value = tex;
-      }
-      // Enable the external reflection by setting strength
       this.externalStrength.value = this._externalStrengthValue;
     } else {
-      // Disable by setting strength to 0
       this.externalStrength.value = 0.0;
     }
   }

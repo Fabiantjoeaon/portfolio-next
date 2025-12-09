@@ -4,6 +4,9 @@ import {
   uniform,
   texture,
   vec2,
+  vec3,
+  vec4,
+  float,
   normalLocal,
   floor,
   fract,
@@ -34,6 +37,7 @@ export class VATMaterial extends THREE.MeshStandardNodeMaterial {
       remapInfo,
       useNormals = false,
       fps = 30,
+      debug = false,
       ...materialOptions
     } = options;
 
@@ -42,6 +46,7 @@ export class VATMaterial extends THREE.MeshStandardNodeMaterial {
     this.vatTexture = vatTexture;
     this.remapInfo = remapInfo;
     this.fps = fps;
+    this.debug = debug;
 
     // Uniforms
     this.timeUniform = uniform(0.0);
@@ -74,6 +79,34 @@ export class VATMaterial extends THREE.MeshStandardNodeMaterial {
     if (useNormals) {
       this._setupNormalNode();
     }
+    
+    // Setup debug color output
+    if (debug) {
+      this._setupDebugColor();
+    }
+  }
+  
+  /**
+   * Setup debug color output to visualize VAT values
+   */
+  _setupDebugColor() {
+    const vatTex = texture(this.vatTexture);
+    const texHeight = this.textureHeightUniform;
+    const frameCount = this.frameCountUniform;
+    const timeU = this.timeUniform;
+
+    this.colorNode = Fn(() => {
+      const vertexU = attribute("vatLookup", "float");
+      
+      // Sample at frame 0 (time=0)
+      const frame0 = float(0);
+      const v0 = frame0.add(float(0.5)).div(texHeight);
+      const sampleUV = vec2(vertexU, v0);
+      const sample = vatTex.sample(sampleUV).xyz;
+      
+      // Output raw texture values as color (should show variation if sampling works)
+      return vec4(sample, float(1.0));
+    })();
   }
 
   /**
@@ -91,7 +124,7 @@ export class VATMaterial extends THREE.MeshStandardNodeMaterial {
 
     this.positionNode = Fn(() => {
       // Get the VAT lookup attribute (normalized U coordinate for texture sampling)
-      // This value comes directly from the UV1.x coordinate in the FBX
+      // This value comes directly from the UV1.x coordinate
       const vertexU = attribute("vatLookup", "float");
 
       // Calculate frame from normalized time (0-1)
@@ -108,10 +141,11 @@ export class VATMaterial extends THREE.MeshStandardNodeMaterial {
       const frameFract = fract(frameFloat);
 
       // Calculate V coordinates for both frames
-      // Position data is in the first half of the texture (rows 0 to frameCount-1)
+      // OpenVAT stores frame 0 at row 0 (top of texture when flipY=false)
+      // Position data is in rows 0 to frameCount-1
       // Add 0.5 to sample center of texel
-      const v0 = frame0.add(0.5).div(texHeight);
-      const v1 = frame1.add(0.5).div(texHeight);
+      const v0 = frame0.add(float(0.5)).div(texHeight);
+      const v1 = frame1.add(float(0.5)).div(texHeight);
 
       // Sample VAT texture at both frames
       const sampleUV0 = vec2(vertexU, v0);
@@ -134,7 +168,6 @@ export class VATMaterial extends THREE.MeshStandardNodeMaterial {
       const boundsRange = maxBounds.sub(minBounds);
       const position = minBounds.add(finalSample.mul(boundsRange));
 
-      // For Blender VAT exports, the position IS the final position (not an offset)
       return position;
     })();
   }
@@ -173,8 +206,8 @@ export class VATMaterial extends THREE.MeshStandardNodeMaterial {
       // Normals are stored in the second half of the texture
       // V coordinate offset by frameCount (position frames take first half)
       const normalOffset = frameCount;
-      const v0 = frame0.add(normalOffset).add(0.5).div(texHeight);
-      const v1 = frame1.add(normalOffset).add(0.5).div(texHeight);
+      const v0 = frame0.add(normalOffset).add(float(0.5)).div(texHeight);
+      const v1 = frame1.add(normalOffset).add(float(0.5)).div(texHeight);
 
       // Sample normal texture at both frames
       const sampleUV0 = vec2(vertexU, v0);
@@ -194,7 +227,11 @@ export class VATMaterial extends THREE.MeshStandardNodeMaterial {
       const finalSample = mix(sample0, interpolatedSample, interpolateU);
 
       // Remap from 0-1 to -1 to 1 range for normals
-      const animatedNormal = finalSample.mul(2.0).sub(1.0).normalize();
+      const blenderNormal = finalSample.mul(2.0).sub(1.0);
+      
+      // Convert from Blender coordinate system to Three.js
+      // Swap Y and Z: (x, y, z) -> (x, z, y)
+      const animatedNormal = vec3(blenderNormal.x, blenderNormal.z, blenderNormal.y).normalize();
 
       // Blend between static and animated normals based on useNormals flag
       return mix(normalLocal, animatedNormal, useNormalsU);

@@ -1,7 +1,7 @@
 import * as THREE from "three/webgpu";
 import BaseScene from "./BaseScene.js";
 import { SwipeTransition } from "../graphics/transitions/SwipeTransition.js";
-import { VATMaterial, vatLoader } from "../graphics/lib/VAT/index.js";
+import { ClothVATMaterial, vatLoader } from "../graphics/lib/VAT/index.js";
 import pane from "../ui/pane.js";
 
 export default class TestScene extends BaseScene {
@@ -71,41 +71,53 @@ export default class TestScene extends BaseScene {
 
   async _setupFlower() {
     try {
-      // Load VAT assets from OpenVAT export
+      // Load rose VAT with FBX
       const { geometry, vatTexture, remapInfo } = await vatLoader.load(
-        "/assets/scenes/meadow/flowers/rose_vat/GNRose"
+        "/assets/scenes/meadow/flowers/rose_vat/GNRose",
+        "fbx"
       );
 
-      console.log(`VAT: Loaded mesh with ${geometry.attributes.position.count} vertices`);
-      console.log(`VAT: Texture ${remapInfo.textureWidth}x${remapInfo.textureHeight}, ${remapInfo.frames} frames`);
-      console.log(`VAT: Bounds min:`, remapInfo.min, 'max:', remapInfo.max);
+      // Get texture dimensions
+      const frameCount = remapInfo.frames;
+      const vertexCount = vatTexture.image.width;
 
-      // Create VAT material
-      this.vatMaterial = new VATMaterial({
-        vatTexture,
-        remapInfo,
-        useNormals: false,
+      console.log(`Rose VAT: ${vertexCount} VAT vertices, ${frameCount} frames`);
+      console.log(`Rose VAT: Geometry has ${geometry.attributes.position.count} mesh vertices`);
+      console.log(`Rose VAT: Bounds min:`, remapInfo.min);
+      console.log(`Rose VAT: Bounds max:`, remapInfo.max);
+
+      // Create ClothVAT material with OpenVAT bounds remapping
+      this.vatMaterial = new ClothVATMaterial({
+        posTexture: vatTexture,
+        frameCount,
+        fps: 30,
+        minBounds: remapInfo.min,
+        maxBounds: remapInfo.max,
         color: 0xe85a71,
         roughness: 0.5,
         metalness: 0.0,
         side: THREE.DoubleSide,
       });
 
-      // Create mesh using the FBX geometry (has proper faces/triangles)
+      // Create mesh
       const flower = new THREE.Mesh(geometry, this.vatMaterial);
-      
-      // Rotate for Blender coordinate system (-Z Forward, Y Up) to Three.js
+
+      // Rotate from Blender coordinates (Z-up) to Three.js (Y-up)
       flower.rotation.x = -Math.PI / 2;
-      
+
       flower.castShadow = true;
       flower.receiveShadow = true;
-      
+
       this.scene.add(flower);
       this.flower = flower;
 
-      console.log(`VAT: Added mesh with ${geometry.index ? geometry.index.count / 3 : 'N/A'} triangles`);
+      // Store frame info for tweakpane
+      this.frameCount = frameCount;
+      this.vatVertexCount = vertexCount;
+
+      console.log(`Rose: Added mesh with ${geometry.index ? geometry.index.count / 3 : "N/A"} triangles`);
     } catch (error) {
-      console.error("Failed to load VAT flower:", error);
+      console.error("Failed to load rose VAT:", error);
     }
   }
 
@@ -114,7 +126,7 @@ export default class TestScene extends BaseScene {
 
     // Create VAT controls folder
     this.vatFolder = pane.addFolder({
-      title: "VAT Animation",
+      title: "Cloth VAT",
       expanded: true,
     });
 
@@ -124,8 +136,6 @@ export default class TestScene extends BaseScene {
       speed: 1.0,
       playing: true,
       loop: true,
-      interpolate: true,
-      useNormals: false,
     };
 
     // Time scrubber
@@ -176,37 +186,19 @@ export default class TestScene extends BaseScene {
         this.vatMaterial.setLoop(ev.value);
       });
 
-    // Interpolation toggle
-    this.vatFolder
-      .addBinding(this.vatControls, "interpolate", {
-        label: "Interpolate",
-      })
-      .on("change", (ev) => {
-        this.vatMaterial.setInterpolate(ev.value);
-      });
-
-    // Animated normals toggle
-    this.vatFolder
-      .addBinding(this.vatControls, "useNormals", {
-        label: "Animated Normals",
-      })
-      .on("change", (ev) => {
-        this.vatMaterial.setUseNormals(ev.value);
-      });
-
     // Info display
     this.vatFolder.addBlade({
       view: "text",
       label: "Frames",
-      value: `${this.vatMaterial.frameCount}`,
+      value: `${this.frameCount}`,
       parse: (v) => String(v),
       disabled: true,
     });
 
     this.vatFolder.addBlade({
       view: "text",
-      label: "Duration",
-      value: `${this.vatMaterial.duration.toFixed(2)}s`,
+      label: "VAT Vertices",
+      value: `${this.vatVertexCount}`,
       parse: (v) => String(v),
       disabled: true,
     });

@@ -1,5 +1,6 @@
 import * as THREE from "three/webgpu";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 
 /**
@@ -15,24 +16,33 @@ import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 export class VATLoader {
   constructor() {
     this.fbxLoader = new FBXLoader();
+    this.gltfLoader = new GLTFLoader();
     this.exrLoader = new EXRLoader();
   }
 
   /**
    * Load all VAT assets from a base path
    * @param {string} basePath - Base path without extension
+   * @param {string} meshFormat - Mesh format: 'glb', 'gltf', or 'fbx' (default: 'glb')
    * @returns {Promise<{geometry: THREE.BufferGeometry, vatTexture: THREE.DataTexture, remapInfo: Object}>}
    */
-  async load(basePath) {
-    const [fbxResult, vatTexture, remapInfo] = await Promise.all([
-      this.loadFBX(`${basePath}.fbx`),
+  async load(basePath, meshFormat = "glb") {
+    const meshExtension =
+      meshFormat === "gltf" ? "gltf" : meshFormat === "fbx" ? "fbx" : "glb";
+    const loadMesh =
+      meshExtension === "fbx"
+        ? this.loadFBX(`${basePath}.${meshExtension}`)
+        : this.loadGLTF(`${basePath}.${meshExtension}`);
+
+    const [meshResult, vatTexture, remapInfo] = await Promise.all([
+      loadMesh,
       this.loadEXR(`${basePath}_vat.exr`),
       this.loadJSON(`${basePath}-remap_info.json`),
     ]);
 
-    console.log("FBX", fbxResult);
+    console.log("meshResult", meshResult);
 
-    const geometry = fbxResult.geometry;
+    const geometry = meshResult.geometry;
 
     // Store texture dimensions in remapInfo for the material
     remapInfo.textureWidth = vatTexture.image.width;
@@ -42,6 +52,55 @@ export class VATLoader {
       geometry,
       vatTexture,
       remapInfo,
+    };
+  }
+
+  /**
+   * Load cloth demo VAT assets (different format with separate pos/rot/col textures)
+   * @param {string} basePath - Base path like '/assets/.../cloth' (without _pos.exr etc)
+   * @returns {Promise<{geometry: THREE.BufferGeometry, posTexture: THREE.DataTexture, rotTexture: THREE.DataTexture, colTexture: THREE.DataTexture}>}
+   */
+  async loadClothDemo(basePath) {
+    const [meshResult, posTexture, rotTexture, colTexture] = await Promise.all([
+      this.loadFBX(`${basePath}_mesh.fbx`),
+      this.loadEXR(`${basePath}_pos.exr`),
+      this.loadEXR(`${basePath}_rot.exr`),
+      this.loadEXR(`${basePath}_col.exr`),
+    ]);
+
+    console.log("Cloth demo loaded:");
+    console.log(
+      "  Mesh vertices:",
+      meshResult.geometry.attributes.position.count
+    );
+    console.log(
+      "  Position texture:",
+      posTexture.image.width,
+      "x",
+      posTexture.image.height
+    );
+    console.log(
+      "  Rotation texture:",
+      rotTexture.image.width,
+      "x",
+      rotTexture.image.height
+    );
+    console.log(
+      "  Color texture:",
+      colTexture.image.width,
+      "x",
+      colTexture.image.height
+    );
+    console.log(
+      "  Geometry attributes:",
+      Object.keys(meshResult.geometry.attributes)
+    );
+
+    return {
+      geometry: meshResult.geometry,
+      posTexture,
+      rotTexture,
+      colTexture,
     };
   }
 
@@ -112,6 +171,82 @@ export class VATLoader {
 
           console.log(
             `VAT FBX: Final merged geometry has ${geometry.attributes.position.count} vertices`
+          );
+          resolve({ geometry });
+        },
+        undefined,
+        reject
+      );
+    });
+  }
+
+  /**
+   * Load GLTF/GLB and extract ALL mesh geometries, merging them
+   * OpenVAT exports may contain multiple meshes (e.g., stem + flower)
+   * @param {string} url
+   * @returns {Promise<{geometry: THREE.BufferGeometry}>}
+   */
+  async loadGLTF(url) {
+    return new Promise((resolve, reject) => {
+      this.gltfLoader.load(
+        url,
+        (gltf) => {
+          const meshes = [];
+
+          gltf.scene.traverse((child) => {
+            if (child.isMesh) {
+              const geo = child.geometry;
+              const vertCount = geo.attributes.position.count;
+
+              console.log(`VAT GLTF: Found mesh "${child.name}"`);
+              console.log(`  - Vertices: ${vertCount}`);
+              console.log(`  - Attributes:`, Object.keys(geo.attributes));
+
+              // Log UV channels
+              for (const [name, attr] of Object.entries(geo.attributes)) {
+                if (name.startsWith("uv")) {
+                  const minU = Math.min(
+                    ...Array.from(attr.array).filter(
+                      (_, i) => i % attr.itemSize === 0
+                    )
+                  );
+                  const maxU = Math.max(
+                    ...Array.from(attr.array).filter(
+                      (_, i) => i % attr.itemSize === 0
+                    )
+                  );
+                  console.log(
+                    `  - ${name}: count=${attr.count}, U range: ${minU.toFixed(
+                      4
+                    )} to ${maxU.toFixed(4)}`
+                  );
+                }
+              }
+
+              meshes.push(child);
+            }
+          });
+
+          if (meshes.length === 0) {
+            reject(new Error("No mesh found in GLTF file"));
+            return;
+          }
+
+          console.log(`VAT GLTF: Found ${meshes.length} mesh(es), merging...`);
+
+          // Merge all meshes into one geometry
+          let geometry;
+          if (meshes.length === 1) {
+            geometry = meshes[0].geometry;
+          } else {
+            geometry = this._mergeGeometries(meshes);
+          }
+
+          // Setup VAT lookup from the appropriate UV channel
+          this._setupVATLookup(geometry);
+
+          console.log(
+            `VAT GLTF: Final merged geometry has ${geometry.attributes.position.count} vertices`
           );
           resolve({ geometry });
         },
@@ -315,10 +450,18 @@ export class VATLoader {
           texture.magFilter = THREE.NearestFilter;
           texture.wrapS = THREE.ClampToEdgeWrapping;
           texture.wrapT = THREE.ClampToEdgeWrapping;
+
+          // Prevent any color space conversions - we need raw values
+          texture.colorSpace = THREE.NoColorSpace;
+
+          // EXR files are top-to-bottom, flipY=false means V=0 is at top
+          // We'll flip in shader to match OpenVAT convention
+          texture.flipY = false;
+
           texture.needsUpdate = true;
 
           console.log(
-            `VAT EXR: Loaded ${texture.image.width}x${texture.image.height}`
+            `VAT EXR: Loaded ${texture.image.width}x${texture.image.height}, flipY=${texture.flipY}`
           );
           resolve(texture);
         },
