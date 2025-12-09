@@ -3,10 +3,12 @@ import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 
 /**
- * Loads VAT (Vertex Animation Texture) assets.
- * Expects a base path like '/assets/scenes/meadow/flowers/roseNormal_vat/GNRose'
+ * Loads VAT (Vertex Animation Texture) assets exported from OpenVAT.
+ * https://extensions.blender.org/add-ons/openvat/
+ * 
+ * Expects a base path like '/assets/scenes/meadow/flowers/rose_vat/GNRose'
  * and will load:
- *   - {basePath}.fbx - the mesh
+ *   - {basePath}.fbx - the mesh with VAT_UV mapping
  *   - {basePath}_vat.exr - the vertex animation texture
  *   - {basePath}-remap_info.json - min/max bounds and frame count
  */
@@ -18,8 +20,8 @@ export class VATLoader {
 
   /**
    * Load all VAT assets from a base path
-   * @param {string} basePath - Base path without extension (e.g., '/assets/.../GNRose')
-   * @returns {Promise<{geometry: THREE.BufferGeometry, vatTexture: THREE.DataTexture, remapInfo: Object, vertexCount: number}>}
+   * @param {string} basePath - Base path without extension
+   * @returns {Promise<{geometry: THREE.BufferGeometry, vatTexture: THREE.DataTexture, remapInfo: Object}>}
    */
   async load(basePath) {
     const [fbxResult, vatTexture, remapInfo] = await Promise.all([
@@ -28,26 +30,22 @@ export class VATLoader {
       this.loadJSON(`${basePath}-remap_info.json`),
     ]);
 
-    // Add vertex count to remapInfo for material to know the total
     const geometry = fbxResult.geometry;
     
-    // Calculate the actual vertex count used in the VAT texture
-    // The texture width should match the number of unique vertices in the VAT
-    const vatVertexCount = vatTexture.image.width;
+    // Store texture dimensions in remapInfo for the material
+    remapInfo.textureWidth = vatTexture.image.width;
+    remapInfo.textureHeight = vatTexture.image.height;
     
     return {
       geometry,
       vatTexture,
-      remapInfo: {
-        ...remapInfo,
-        vatVertexCount,
-      },
+      remapInfo,
     };
   }
 
   /**
-   * Load FBX and extract ALL mesh geometries, merging them into one
-   * Also creates a vatLookup attribute for proper VAT lookup
+   * Load FBX and extract the mesh geometry
+   * OpenVAT exports include a VAT_UV channel for texture lookup
    * @param {string} url
    * @returns {Promise<{geometry: THREE.BufferGeometry}>}
    */
@@ -56,34 +54,42 @@ export class VATLoader {
       this.fbxLoader.load(
         url,
         (group) => {
-          const meshes = [];
+          let geometry = null;
+          let totalVertices = 0;
 
           group.traverse((child) => {
             if (child.isMesh) {
-              console.log(`VAT: Found mesh "${child.name}" with ${child.geometry.attributes.position.count} vertices`);
-              meshes.push(child);
+              const geo = child.geometry;
+              const vertCount = geo.attributes.position.count;
+              totalVertices += vertCount;
+              
+              console.log(`VAT FBX: Found mesh "${child.name}"`);
+              console.log(`  - Vertices: ${vertCount}`);
+              console.log(`  - Attributes:`, Object.keys(geo.attributes));
+              
+              // Log UV channels
+              for (const [name, attr] of Object.entries(geo.attributes)) {
+                if (name.startsWith('uv')) {
+                  console.log(`  - ${name}: itemSize=${attr.itemSize}, count=${attr.count}`);
+                }
+              }
+              
+              if (!geometry) {
+                geometry = geo;
+              }
             }
           });
 
-          if (meshes.length === 0) {
+          if (!geometry) {
             reject(new Error("No mesh found in FBX file"));
             return;
           }
 
-          console.log(`VAT: Found ${meshes.length} mesh(es) in FBX`);
+          // Setup VAT lookup from the appropriate UV channel
+          // OpenVAT stores VAT coordinates in UV channel (might be uv, uv1, or uv2)
+          this._setupVATLookup(geometry);
 
-          let geometry;
-          if (meshes.length === 1) {
-            // Single mesh - use directly
-            geometry = meshes[0].geometry;
-          } else {
-            // Multiple meshes - merge them
-            geometry = this._mergeGeometries(meshes);
-          }
-
-          // Create vatLookup attribute based on UV1 values
-          this._createVATIndexAttribute(geometry);
-
+          console.log(`VAT FBX: Total vertices loaded: ${totalVertices}`);
           resolve({ geometry });
         },
         undefined,
@@ -93,94 +99,79 @@ export class VATLoader {
   }
 
   /**
-   * Merge multiple mesh geometries into one
-   * @param {THREE.Mesh[]} meshes
-   * @returns {THREE.BufferGeometry}
-   */
-  _mergeGeometries(meshes) {
-    // Collect all geometries with their world transforms
-    const geometries = meshes.map(mesh => {
-      const geo = mesh.geometry.clone();
-      
-      // Apply mesh transform to geometry
-      mesh.updateMatrixWorld(true);
-      geo.applyMatrix4(mesh.matrixWorld);
-      
-      return geo;
-    });
-
-    // Use BufferGeometryUtils to merge
-    const { mergeGeometries } = THREE.BufferGeometryUtils;
-    if (mergeGeometries) {
-      return mergeGeometries(geometries, false);
-    }
-
-    // Fallback: manual merge
-    return this._manualMergeGeometries(geometries);
-  }
-
-  /**
-   * Manually merge geometries if BufferGeometryUtils isn't available
-   * @param {THREE.BufferGeometry[]} geometries
-   * @returns {THREE.BufferGeometry}
-   */
-  _manualMergeGeometries(geometries) {
-    const merged = new THREE.BufferGeometry();
-    
-    // Collect all attribute arrays
-    const positions = [];
-    const normals = [];
-    const uvs = [];
-    const uv1s = [];
-    
-    for (const geo of geometries) {
-      const pos = geo.attributes.position;
-      const norm = geo.attributes.normal;
-      const uv = geo.attributes.uv;
-      const uv1 = geo.attributes.uv1;
-      
-      for (let i = 0; i < pos.count; i++) {
-        positions.push(pos.getX(i), pos.getY(i), pos.getZ(i));
-        if (norm) normals.push(norm.getX(i), norm.getY(i), norm.getZ(i));
-        if (uv) uvs.push(uv.getX(i), uv.getY(i));
-        if (uv1) uv1s.push(uv1.getX(i), uv1.getY(i));
-      }
-    }
-    
-    merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    if (normals.length > 0) merged.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-    if (uvs.length > 0) merged.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-    if (uv1s.length > 0) merged.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1s, 2));
-    
-    return merged;
-  }
-
-  /**
-   * Create a vatLookup attribute that stores the correct U coordinate for VAT sampling
-   * Uses the original UV1.x coordinates which map to specific texture columns
+   * Setup the vatLookup attribute from UV data
+   * OpenVAT uses a dedicated UV channel where U = vertex index / texture width
    * @param {THREE.BufferGeometry} geometry
    */
-  _createVATIndexAttribute(geometry) {
-    const uv1 = geometry.attributes.uv1;
-    if (!uv1) {
-      console.warn("VAT: No uv1 attribute found, VAT lookup may not work correctly");
+  _setupVATLookup(geometry) {
+    // Try different UV channel names that OpenVAT might use
+    // In FBX exports, the VAT_UV channel usually maps to uv1 or uv2
+    const uvChannels = ['uv1', 'uv2', 'uv'];
+    let vatUV = null;
+    let channelName = '';
+    
+    for (const name of uvChannels) {
+      if (geometry.attributes[name]) {
+        const attr = geometry.attributes[name];
+        // Check if this looks like a VAT UV (values should span 0-1 for vertex indexing)
+        let minU = Infinity, maxU = -Infinity;
+        for (let i = 0; i < Math.min(attr.count, 100); i++) {
+          const u = attr.array[i * attr.itemSize];
+          minU = Math.min(minU, u);
+          maxU = Math.max(maxU, u);
+        }
+        console.log(`VAT: Checking ${name} - U range: ${minU.toFixed(4)} to ${maxU.toFixed(4)}`);
+        
+        // VAT UV should have values spanning a good portion of 0-1
+        if (maxU > minU && maxU <= 1.0) {
+          vatUV = attr;
+          channelName = name;
+          break;
+        }
+      }
+    }
+
+    if (!vatUV) {
+      console.warn("VAT: No suitable UV channel found for VAT lookup");
+      // Create a fallback based on vertex index
+      this._createFallbackVATLookup(geometry);
       return;
     }
 
+    console.log(`VAT: Using ${channelName} for VAT lookup`);
+    
+    // Create vatLookup attribute from the UV.x values
     const vertexCount = geometry.attributes.position.count;
     const vatLookup = new Float32Array(vertexCount);
-    const uniqueUValues = new Set();
     
     for (let i = 0; i < vertexCount; i++) {
-      const u = uv1.array[i * 2];
-      vatLookup[i] = u;
-      uniqueUValues.add(u);
+      // The U coordinate maps directly to the texture column
+      vatLookup[i] = vatUV.array[i * vatUV.itemSize];
     }
     
     geometry.setAttribute('vatLookup', new THREE.BufferAttribute(vatLookup, 1));
-    geometry.userData.vatVertexCount = uniqueUValues.size;
     
-    console.log(`VAT: Created vatLookup with ${uniqueUValues.size} unique U coordinates for ${vertexCount} vertices`);
+    // Count unique values
+    const uniqueValues = new Set(vatLookup);
+    console.log(`VAT: Created vatLookup with ${uniqueValues.size} unique values for ${vertexCount} vertices`);
+  }
+
+  /**
+   * Create fallback VAT lookup when no UV channel is found
+   * This assumes vertices are ordered to match texture columns
+   * @param {THREE.BufferGeometry} geometry
+   */
+  _createFallbackVATLookup(geometry) {
+    const vertexCount = geometry.attributes.position.count;
+    const vatLookup = new Float32Array(vertexCount);
+    
+    for (let i = 0; i < vertexCount; i++) {
+      // Normalize vertex index to 0-1 range, sampling center of texel
+      vatLookup[i] = (i + 0.5) / vertexCount;
+    }
+    
+    geometry.setAttribute('vatLookup', new THREE.BufferAttribute(vatLookup, 1));
+    console.log(`VAT: Created fallback vatLookup for ${vertexCount} vertices`);
   }
 
   /**
@@ -200,6 +191,7 @@ export class VATLoader {
           texture.wrapT = THREE.ClampToEdgeWrapping;
           texture.needsUpdate = true;
 
+          console.log(`VAT EXR: Loaded ${texture.image.width}x${texture.image.height}`);
           resolve(texture);
         },
         undefined,
@@ -210,6 +202,7 @@ export class VATLoader {
 
   /**
    * Load remap info JSON
+   * OpenVAT format: { "os-remap": { "Min": [x,y,z], "Max": [x,y,z], "Frames": n } }
    * @param {string} url
    * @returns {Promise<Object>}
    */
@@ -220,7 +213,7 @@ export class VATLoader {
     }
     const data = await response.json();
 
-    // Parse the remap info structure
+    // Parse the OpenVAT remap info structure
     const osRemap = data["os-remap"];
     return {
       min: new THREE.Vector3(...osRemap.Min),
@@ -232,4 +225,3 @@ export class VATLoader {
 
 // Singleton instance for convenience
 export const vatLoader = new VATLoader();
-

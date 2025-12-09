@@ -71,78 +71,42 @@ export default class TestScene extends BaseScene {
 
   async _setupFlower() {
     try {
-      // Load VAT assets (without normals for now - the working version)
-      const { vatTexture, remapInfo } = await vatLoader.load(
+      // Load VAT assets from OpenVAT export
+      const { geometry, vatTexture, remapInfo } = await vatLoader.load(
         "/assets/scenes/meadow/flowers/rose_vat/GNRose"
       );
 
-      const textureWidth = vatTexture.image.width;
-      console.log(
-        `VAT: Texture ${textureWidth}x${vatTexture.image.height}, ${remapInfo.frames} frames`
-      );
-
-      // Create geometry sampling the full texture width
-      const fullGeometry = this._createFullVATGeometry(textureWidth);
+      console.log(`VAT: Loaded mesh with ${geometry.attributes.position.count} vertices`);
+      console.log(`VAT: Texture ${remapInfo.textureWidth}x${remapInfo.textureHeight}, ${remapInfo.frames} frames`);
+      console.log(`VAT: Bounds min:`, remapInfo.min, 'max:', remapInfo.max);
 
       // Create VAT material
       this.vatMaterial = new VATMaterial({
         vatTexture,
         remapInfo,
         useNormals: false,
-        color: 0x00ff00,
+        color: 0xe85a71,
         roughness: 0.5,
         metalness: 0.0,
         side: THREE.DoubleSide,
       });
 
-      // Render as point cloud (full rose)
-      const pointsMaterial = new THREE.PointsNodeMaterial({
-        size: 4,
-        sizeAttenuation: true,
-        color: 0xe85a71,
-      });
-      pointsMaterial.positionNode = this.vatMaterial.positionNode;
+      // Create mesh using the FBX geometry (has proper faces/triangles)
+      const flower = new THREE.Mesh(geometry, this.vatMaterial);
+      
+      // Rotate for Blender coordinate system (-Z Forward, Y Up) to Three.js
+      flower.rotation.x = -Math.PI / 2;
+      
+      flower.castShadow = true;
+      flower.receiveShadow = true;
+      
+      this.scene.add(flower);
+      this.flower = flower;
 
-      const points = new THREE.Points(fullGeometry, pointsMaterial);
-
-      // Rotate so flower grows upward from ground (Blender Z-up to Three.js Y-up)
-      points.rotation.x = Math.PI / 2;
-      points.rotation.y = Math.PI; // Flip on Y axis
-
-      this.scene.add(points);
-      this.pointsMaterial = pointsMaterial;
-
-      console.log(`VAT: Point cloud with ${textureWidth} vertices`);
+      console.log(`VAT: Added mesh with ${geometry.index ? geometry.index.count / 3 : 'N/A'} triangles`);
     } catch (error) {
       console.error("Failed to load VAT flower:", error);
     }
-  }
-
-  /**
-   * Create geometry that samples every column of the VAT texture
-   */
-  _createFullVATGeometry(textureWidth) {
-    const geometry = new THREE.BufferGeometry();
-
-    const positions = new Float32Array(textureWidth * 3);
-    const normals = new Float32Array(textureWidth * 3);
-    const vatLookup = new Float32Array(textureWidth);
-
-    for (let i = 0; i < textureWidth; i++) {
-      positions[i * 3] = 0;
-      positions[i * 3 + 1] = 0;
-      positions[i * 3 + 2] = 0;
-      normals[i * 3] = 0;
-      normals[i * 3 + 1] = 1;
-      normals[i * 3 + 2] = 0;
-      vatLookup[i] = (i + 0.5) / textureWidth;
-    }
-
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
-    geometry.setAttribute("vatLookup", new THREE.BufferAttribute(vatLookup, 1));
-
-    return geometry;
   }
 
   _setupTweakpane() {
@@ -162,7 +126,6 @@ export default class TestScene extends BaseScene {
       loop: true,
       interpolate: true,
       useNormals: false,
-      pointSize: 4,
     };
 
     // Time scrubber
@@ -229,20 +192,6 @@ export default class TestScene extends BaseScene {
       })
       .on("change", (ev) => {
         this.vatMaterial.setUseNormals(ev.value);
-      });
-
-    // Point size control
-    this.vatFolder
-      .addBinding(this.vatControls, "pointSize", {
-        label: "Point Size",
-        min: 1,
-        max: 20,
-        step: 1,
-      })
-      .on("change", (ev) => {
-        if (this.pointsMaterial) {
-          this.pointsMaterial.size = ev.value;
-        }
       });
 
     // Info display
