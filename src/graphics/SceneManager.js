@@ -111,42 +111,17 @@ export class SceneManager {
     this.persistent.gbuffer.resize(width, height, devicePixelRatio);
   }
 
-  // TODO: Update?
   render(timeMs, delta) {
     const renderer = this.renderer;
     const prev = this.scenes.get(this.activePrevId);
-
     const next = this.scenes.get(this.activeNextId);
 
     // Get the shared camera
     const camera = this.cameraController.camera;
 
-    if (!this.hidePersistentScene) {
-      this.persistent.update(timeMs, delta);
-    }
-
     // Disable autoClear to handle clearing manually per render target
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
-
-    // Render persistent scene FIRST so its gbuffer is available for other scenes
-    if (
-      !this.hidePersistentScene &&
-      !this.persistent.isEmpty() &&
-      this.persistent.gbuffer
-    ) {
-      renderer.setRenderTarget(this.persistent.gbuffer.target);
-      renderer.setMRT(
-        mrt({
-          output,
-          normal: this.normalOutputNode,
-        })
-      );
-      renderer.setClearColor(0x000000, 0);
-      renderer.clear();
-      renderer.render(this.persistent.scene, camera);
-      renderer.setMRT(null);
-    }
 
     // Pass persistent scene to scenes that need it for reflections
     // The scene can then render its own reflection pass
@@ -175,6 +150,7 @@ export class SceneManager {
       next.sceneObj.setPersistentBuffer(this.persistent.gbuffer);
     }
 
+    // Render active scenes FIRST so their textures are available for persistent scene glass effect
     // Always update and render the prev scene
     if (prev?.update) prev.update(timeMs, delta);
     if (prev) {
@@ -222,6 +198,28 @@ export class SceneManager {
       // No overrideMaterial - use forward rendering with proper materials/lighting
       renderer.render(next.scene, camera);
       renderer.setMRT(null);
+    }
+
+    // Render persistent scene AFTER active scenes so it can sample their textures for glass effect
+    if (!this.hidePersistentScene) {
+      this.persistent.update(timeMs, delta);
+
+      // Pass the active scene's albedo texture to persistent scene for glass sampling
+      this.persistent.setSceneTexture(prev?.gbuffer.albedo ?? null);
+
+      if (!this.persistent.isEmpty() && this.persistent.gbuffer) {
+        renderer.setRenderTarget(this.persistent.gbuffer.target);
+        renderer.setMRT(
+          mrt({
+            output,
+            normal: this.normalOutputNode,
+          })
+        );
+        renderer.setClearColor(0x000000, 0);
+        renderer.clear();
+        renderer.render(this.persistent.scene, camera);
+        renderer.setMRT(null);
+      }
     }
 
     // Restore autoClear

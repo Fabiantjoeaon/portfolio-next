@@ -275,6 +275,16 @@ export class Grid extends THREE.Group {
   }
 
   /**
+   * Set the scene texture for glass effect sampling
+   * @param {THREE.Texture} texture - The active scene's albedo texture
+   */
+  setSceneTexture(texture) {
+    if (this.material?._sceneTextureNode && texture) {
+      this.material._sceneTextureNode.value = texture;
+    }
+  }
+
+  /**
    * Get grid info
    * @returns {Object}
    */

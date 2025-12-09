@@ -3,13 +3,38 @@ import { NodeMaterial } from "three/webgpu";
 import {
   attribute,
   positionLocal,
+  positionWorld,
+  normalWorld,
+  normalView,
+  cameraPosition,
   uniform,
+  vec2,
   vec3,
   vec4,
   float,
   mul,
   add,
+  sub,
+  dot,
+  normalize,
+  max,
+  pow,
+  mix,
+  screenUV,
+  texture,
+  Fn,
 } from "three/tsl";
+
+// Create a placeholder texture for when no scene texture is available
+let _placeholderTexture = null;
+function getPlaceholderTexture() {
+  if (!_placeholderTexture) {
+    const data = new Uint8Array([128, 128, 128, 255]); // Gray pixel
+    _placeholderTexture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat);
+    _placeholderTexture.needsUpdate = true;
+  }
+  return _placeholderTexture;
+}
 
 /**
  * Creates a rounded rectangle shape
@@ -77,8 +102,9 @@ export function createTileGeometry(
 }
 
 /**
- * Creates a TSL NodeMaterial for the grid tiles
+ * Creates a TSL NodeMaterial for the grid tiles with glass refraction effect
  * Accepts instance attributes for position, offset, scale, and color
+ * Samples the scene texture with normal-based distortion for glass look
  * @param {Object} options - Material options
  * @returns {NodeMaterial}
  */
@@ -88,6 +114,15 @@ export function createTileMaterial(options = {}) {
   // Uniforms for global control
   const baseColorUniform = uniform(new THREE.Color(options.color || 0xffffff));
   const opacityUniform = uniform(options.opacity ?? 1.0);
+
+  // Glass effect uniforms
+  const refractionStrength = uniform(options.refractionStrength ?? 0.02);
+  const fresnelPower = uniform(options.fresnelPower ?? 3.0);
+  const tintStrength = uniform(options.tintStrength ?? 0.15);
+
+  // Create texture node with placeholder - will be updated at runtime
+  const placeholderTex = getPlaceholderTexture();
+  const sceneTextureNode = texture(placeholderTex);
 
   // Instance attributes - these will be set by the InstancedMesh
   // instancePosition: base grid position (vec3)
@@ -104,21 +139,55 @@ export function createTileMaterial(options = {}) {
   const finalPos = add(add(scaledPos, instancePosition), instanceOffset);
   material.positionNode = finalPos;
 
-  // Fragment output: blend base color with instance color
-  const finalColor = mul(vec3(baseColorUniform), instanceColor.xyz);
-  const finalAlpha = mul(opacityUniform, instanceColor.w);
-  material.colorNode = vec4(finalColor, finalAlpha);
+  // Fragment: glass effect with refraction and fresnel
+  material.colorNode = Fn(() => {
+    // Get view-space normal for distortion
+    const normal = normalView;
+
+    // Calculate screen UV with normal-based distortion for refraction
+    const distortion = normal.xy.mul(refractionStrength);
+    const refractedUV = screenUV.add(distortion);
+
+    // Sample scene texture with distorted UVs using the texture node's uv method
+    const sceneColor = sceneTextureNode.uv(refractedUV).rgb;
+
+    // Calculate fresnel for edge highlights (glass rim effect)
+    const viewDir = normalize(sub(cameraPosition, positionWorld));
+    const NdotV = max(dot(normalWorld, viewDir), float(0.0));
+    const fresnel = pow(sub(float(1.0), NdotV), fresnelPower);
+
+    // Base tint color from instance and base color
+    const tintColor = mul(vec3(baseColorUniform), instanceColor.xyz);
+
+    // Blend scene color with tint
+    const tintedScene = mix(sceneColor, tintColor, tintStrength);
+
+    // Add fresnel rim highlight
+    const rimColor = vec3(1.0, 1.0, 1.0);
+    const finalColor = mix(tintedScene, rimColor, mul(fresnel, float(0.3)));
+
+    // Final alpha from opacity uniform and instance color
+    const finalAlpha = mul(opacityUniform, instanceColor.w);
+
+    return vec4(finalColor, finalAlpha);
+  })();
 
   // Material settings
   material.transparent = true;
   material.side = THREE.DoubleSide;
   material.depthWrite = options.depthWrite ?? true;
 
-  // Store uniforms for external access
+  // Store uniforms and texture node for external access
   material.uniforms = {
     baseColor: baseColorUniform,
     opacity: opacityUniform,
+    refractionStrength,
+    fresnelPower,
+    tintStrength,
   };
+
+  // Store texture node separately for updating
+  material._sceneTextureNode = sceneTextureNode;
 
   return material;
 }

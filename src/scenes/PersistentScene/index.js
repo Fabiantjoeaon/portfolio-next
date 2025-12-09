@@ -141,6 +141,16 @@ export default class PersistentScene {
   }
 
   /**
+   * Set the scene texture for glass effect sampling
+   * @param {THREE.Texture} texture - The active scene's albedo texture
+   */
+  setSceneTexture(texture) {
+    if (this.grid) {
+      this.grid.setSceneTexture(texture);
+    }
+  }
+
+  /**
    * Dispose of all resources
    */
   dispose() {

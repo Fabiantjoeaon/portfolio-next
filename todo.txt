@@ -11,6 +11,7 @@ VAT
 
 GRID
 - top right / 0 compute is shocking
+- optimize: pre-compute positions instead of in shader
 
 - https://x.com/Andersonmancini/status/1996162855842746483
 - https://x.com/makio64/status/1996170137901359503
