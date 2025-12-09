@@ -23,7 +23,6 @@ import {
   mul,
   mix,
   diffuseColor,
-  screenUV,
 } from "three/tsl";
 
 /**
@@ -142,8 +141,10 @@ export class WaterWithReflection extends Mesh {
     material.setupOutgoingLight = () => diffuseColor.rgb; // backwards compatibility
 
     material.colorNode = Fn(() => {
+      // Reflector creates proper planar reflection UVs
       const mirrorSampler = reflector();
-      mirrorSampler.uvNode = mirrorSampler.uvNode.add(distortion);
+      const reflectionUV = mirrorSampler.uvNode.add(distortion);
+      mirrorSampler.uvNode = reflectionUV;
       mirrorSampler.reflector.resolutionScale = this.resolutionScale;
 
       this.add(mirrorSampler.target);
@@ -168,17 +169,14 @@ export class WaterWithReflection extends Mesh {
         reflectance
       );
 
-      // Blend external texture (persistent gbuffer) if available
+      // Blend external texture (persistent gbuffer) using reflector's UV
+      // This ensures the external reflection uses the same planar reflection
+      // coordinates with the same water distortion as the scene reflector
       if (this._externalTexture) {
         const externalTex = texture(this._externalTexture);
 
-        // Simple screen-space reflection: flip Y and add distortion
-        const reflectedUV = vec2(
-          screenUV.x.add(distortion.x.mul(0.01)),
-          float(1.0).sub(screenUV.y).add(distortion.y.mul(0.01))
-        );
-
-        const externalColor = externalTex.sample(reflectedUV);
+        // Use the same reflection UV that the reflector uses (includes distortion)
+        const externalColor = externalTex.sample(reflectionUV);
 
         // Blend based on alpha (transparent areas of persistent buffer)
         albedo = mix(
