@@ -14,11 +14,13 @@ import {
   div,
   normalize,
   positionWorld,
+  positionLocal,
   sub,
   time,
   texture,
   vec2,
   vec3,
+  vec4,
   max,
   dot,
   reflect,
@@ -30,6 +32,8 @@ import {
   mul,
   mix,
   diffuseColor,
+  modelViewMatrix,
+  cameraProjectionMatrix,
 } from "three/tsl";
 
 /**
@@ -177,10 +181,20 @@ export class WaterWithReflection extends Mesh {
         reflectance
       );
 
-      // Blend external texture (persistent gbuffer) using reflector's UV
-      // The reflectionUV has proper planar projection and distortion already applied
-      // Try direct reflectionUV - reflector may handle coordinate mapping correctly
-      const externalUV = reflectionUV;
+      // Blend external texture (persistent gbuffer) using screen-space reflection
+      // Compute the water fragment's actual screen position via projection
+      const viewPos = modelViewMatrix.mul(vec4(positionLocal, 1.0));
+      const clipPos = cameraProjectionMatrix.mul(viewPos);
+      const ndcX = clipPos.x.div(clipPos.w);
+      const ndcY = clipPos.y.div(clipPos.w);
+
+      // Convert NDC (-1 to 1) to UV (0 to 1) with Y flipped for reflection
+      // The reflection shows what's above the water, which in screen space means
+      // sampling from the upper part of the screen when we're looking at water below
+      const externalUV = vec2(
+        ndcX.mul(0.5).add(0.5).add(distortion.x),
+        ndcY.negate().mul(0.5).add(0.5).add(distortion.y)
+      );
 
       const externalColor = this.externalTextureNode.sample(externalUV);
 
