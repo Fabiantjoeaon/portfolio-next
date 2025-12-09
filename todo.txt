@@ -14,6 +14,9 @@ VAT
 
 - Loading strategy that also allows workers
 
+- particle system
+    - fake particles/sphere shapes on 2d planes like Samsy did?
+
 ICE: https://x.com/cmzw_/status/1985719540471488863
 
 - CODE CLEANUP: less composition in classes, specifically passing of arguments. things should live more on their own or be exposed more easily

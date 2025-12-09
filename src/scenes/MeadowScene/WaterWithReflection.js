@@ -1,4 +1,11 @@
-import { Color, Mesh, Vector3, MeshLambertNodeMaterial } from "three/webgpu";
+import {
+  Color,
+  Mesh,
+  Vector3,
+  MeshLambertNodeMaterial,
+  DataTexture,
+  RGBAFormat,
+} from "three/webgpu";
 
 import {
   Fn,
@@ -70,13 +77,14 @@ export class WaterWithReflection extends Mesh {
       options.distortionScale !== undefined ? options.distortionScale : 20.0
     );
 
-    // External reflection (addition to WaterMesh)
-    this._externalTexture = null;
-    this.externalStrength = uniform(
+    this.externalTextureNode = texture(this._externalTextureRef);
+
+    // Strength uniform - set to 0 initially (no external reflection until texture is set)
+    this.externalStrength = uniform(0.0);
+    this._externalStrengthValue =
       options.externalReflectionStrength !== undefined
         ? options.externalReflectionStrength
-        : 0.5
-    );
+        : 0.5;
 
     // TSL
 
@@ -170,21 +178,18 @@ export class WaterWithReflection extends Mesh {
       );
 
       // Blend external texture (persistent gbuffer) using reflector's UV
-      // This ensures the external reflection uses the same planar reflection
-      // coordinates with the same water distortion as the scene reflector
-      if (this._externalTexture) {
-        const externalTex = texture(this._externalTexture);
+      // The reflectionUV has proper planar projection and distortion already applied
+      // Try direct reflectionUV - reflector may handle coordinate mapping correctly
+      const externalUV = reflectionUV;
 
-        // Use the same reflection UV that the reflector uses (includes distortion)
-        const externalColor = externalTex.sample(reflectionUV);
+      const externalColor = this.externalTextureNode.sample(externalUV);
 
-        // Blend based on alpha (transparent areas of persistent buffer)
-        albedo = mix(
-          albedo,
-          externalColor.rgb.add(albedo.mul(0.3)),
-          externalColor.a.mul(this.externalStrength)
-        );
-      }
+      // Blend based on strength uniform (ignore alpha for now to debug)
+      albedo = mix(
+        albedo,
+        externalColor.rgb.add(albedo.mul(0.3)),
+        this.externalStrength
+      );
 
       return albedo;
     })();
@@ -195,6 +200,19 @@ export class WaterWithReflection extends Mesh {
    * @param {THREE.Texture} tex
    */
   setExternalReflection(tex) {
-    this._externalTexture = tex;
+    if (tex) {
+      // Update the texture node's source texture
+      // TextureNode stores the texture in .value for uniform-like access
+      this.externalTextureNode.value = tex;
+      // Also try updating the source directly if value doesn't work
+      if (this.externalTextureNode.source) {
+        this.externalTextureNode.source.value = tex;
+      }
+      // Enable the external reflection by setting strength
+      this.externalStrength.value = this._externalStrengthValue;
+    } else {
+      // Disable by setting strength to 0
+      this.externalStrength.value = 0.0;
+    }
   }
 }
