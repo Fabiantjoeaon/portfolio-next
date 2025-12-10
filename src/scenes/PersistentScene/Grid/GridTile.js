@@ -25,17 +25,6 @@ import {
   Fn,
 } from "three/tsl";
 
-// Create a placeholder texture for when no scene texture is available
-let _placeholderTexture = null;
-function getPlaceholderTexture() {
-  if (!_placeholderTexture) {
-    const data = new Uint8Array([128, 128, 128, 255]); // Gray pixel
-    _placeholderTexture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat);
-    _placeholderTexture.needsUpdate = true;
-  }
-  return _placeholderTexture;
-}
-
 /**
  * Creates a rounded rectangle shape
  * @param {number} width - Width of rectangle
@@ -115,14 +104,11 @@ export function createTileMaterial(options = {}) {
   const baseColorUniform = uniform(new THREE.Color(options.color || 0xffffff));
   const opacityUniform = uniform(options.opacity ?? 1.0);
 
-  // Glass effect uniforms
   const refractionStrength = uniform(options.refractionStrength ?? 0.02);
   const fresnelPower = uniform(options.fresnelPower ?? 3.0);
   const tintStrength = uniform(options.tintStrength ?? 0.15);
 
-  // Create texture node with placeholder - will be updated at runtime
-  const placeholderTex = getPlaceholderTexture();
-  const sceneTextureNode = texture(placeholderTex);
+  const sceneTextureNode = texture();
 
   // Instance attributes - these will be set by the InstancedMesh
   // instancePosition: base grid position (vec3)
@@ -149,7 +135,7 @@ export function createTileMaterial(options = {}) {
     const refractedUV = screenUV.add(distortion);
 
     // Sample scene texture with distorted UVs using the texture node's uv method
-    const sceneColor = sceneTextureNode.uv(refractedUV).rgb;
+    const sceneColor = sceneTextureNode.sample(refractedUV).rgb;
 
     // Calculate fresnel for edge highlights (glass rim effect)
     const viewDir = normalize(sub(cameraPosition, positionWorld));

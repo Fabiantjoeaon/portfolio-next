@@ -24,18 +24,13 @@ export class Grid extends THREE.Group {
     super();
 
     this.config = {
-      tileSize: config.tileSize ?? 1.0,
-      gap: config.gap ?? 0.1,
-      cornerRadius: config.cornerRadius ?? 0.1,
-      depth: config.depth ?? 0.15,
       bevel: {
         enabled: config.bevel?.enabled ?? true,
         thickness: config.bevel?.thickness ?? undefined, // auto-calculated if undefined
         size: config.bevel?.size ?? undefined,
         segments: config.bevel?.segments ?? 2,
       },
-      color: config.color ?? 0xffffff,
-      opacity: config.opacity ?? 1.0,
+
       ...config,
     };
 

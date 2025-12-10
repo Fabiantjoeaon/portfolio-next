@@ -35,17 +35,18 @@ export default class PersistentScene {
   _setupGrid() {
     this.grid = new Grid({
       tileSize: 0.8,
-      gap: 0.15,
-      cornerRadius: 0.08,
-      depth: 0.12,
+      gap: 0.35,
+      cornerRadius: 0.12,
+      depth: 0.08,
       bevel: {
         enabled: true,
-        thickness: 0.02,
-        size: 0.015,
-        segments: 2,
+        thickness: 0.1,
+        size: 0.085,
+        // Determines soft/smoothness
+        segments: 1,
       },
       color: 0xffffff,
-      opacity: 0.9,
+      opacity: 1,
       renderer: this.renderer,
       position: new THREE.Vector3(0, 0, -5), // Behind other content
     });

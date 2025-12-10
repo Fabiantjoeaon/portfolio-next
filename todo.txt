@@ -9,6 +9,8 @@ VAT
 - how to get easy variations?
 - can do 2 flowers, then color variations, petals, some only stem
 
+- ANTI-ALIASING
+
 GRID
 - top right / 0 compute is shocking
 - optimize: pre-compute positions instead of in shader
