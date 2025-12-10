@@ -11,10 +11,11 @@ VAT
 
 - ANTI-ALIASING
 
-GRID
+GRID / PLANE
 - top right / 0 compute is shocking
 - optimize: pre-compute positions instead of in shader
-- you can look through the plane on mouse hover?
+- maybe you can look through the plane on mouse hover?
+- make the plane look nicer, some borders maybe? or something from Henry
 
 - https://x.com/Andersonmancini/status/1996162855842746483
 - https://x.com/makio64/status/1996170137901359503

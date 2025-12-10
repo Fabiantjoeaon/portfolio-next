@@ -8,6 +8,8 @@ import { getFlag } from "../lib/query.js";
 
 let _nextSceneId = 1;
 
+export const GROUND_Y = -7;
+
 export class SceneManager {
   constructor(
     renderer,

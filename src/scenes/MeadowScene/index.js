@@ -1,6 +1,7 @@
 import BaseScene from "../BaseScene.js";
 import * as THREE from "three/webgpu";
 import { WaterWithReflection } from "./WaterWithReflection.js";
+import { GROUND_Y } from "../../graphics/SceneManager.js";
 
 export default class MeadowScene extends BaseScene {
   constructor(config = {}) {
@@ -55,7 +56,8 @@ export default class MeadowScene extends BaseScene {
     });
 
     // Position as horizontal floor
-    this.water.position.y = -6;
+    this.water.position.y = GROUND_Y;
+
     this.water.rotation.x = -Math.PI / 2;
     this.scene.add(this.water);
 
