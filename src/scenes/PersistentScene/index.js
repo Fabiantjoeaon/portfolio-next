@@ -11,6 +11,7 @@ import {
   mix,
   time,
   Fn,
+  fract,
 } from "three/tsl";
 import { Grid } from "./Grid/index.js";
 import { GBuffer } from "../../graphics/GBuffer.js";
@@ -139,6 +140,7 @@ export default class PersistentScene {
 
     // Create material with animated gradient shader
     const material = new NodeMaterial();
+    material.transparent = true;
 
     // Gradient colors - can be customized
     const color1 = uniform(new THREE.Color(0xfff)); // Deep blue-purple
@@ -172,10 +174,9 @@ export default class PersistentScene {
         blend.mul(0.5).add(0.25)
       );
 
-      return vec4(finalColor, float(1.0));
+      // return vec4(finalColor, float(1.0));
+      return vec4(finalColor, float(fract(time.mul(0.1))));
     })();
-
-    material.side = THREE.DoubleSide;
 
     // Store uniforms for external access
     material.uniforms = {

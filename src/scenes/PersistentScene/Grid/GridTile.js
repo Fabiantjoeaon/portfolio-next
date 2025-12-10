@@ -25,18 +25,6 @@ import {
   Fn,
 } from "three/tsl";
 
-// Create a small placeholder texture for initial shader compilation
-function createPlaceholderTexture(color = [128, 128, 128, 255]) {
-  const data = new Uint8Array(color);
-  const tex = new DataTexture(data, 1, 1, RGBAFormat);
-  tex.needsUpdate = true;
-  return tex;
-}
-
-// Placeholder colors
-const TRANSPARENT_BLACK = [0, 0, 0, 0];
-const SCREEN_COLOR = [26, 26, 46, 255]; // Match screen gradient color
-
 /**
  * Creates a rounded rectangle shape
  * @param {number} width - Width of rectangle
@@ -120,8 +108,6 @@ export function createTileMaterial(options = {}) {
   const refractionStrength = uniform(options.refractionStrength ?? 0.02);
   const fresnelPower = uniform(options.fresnelPower ?? 3.0);
   const tintStrength = uniform(options.tintStrength ?? 0.15);
-
-  // Create placeholder textures for proper shader compilation
 
   // Color textures
   const sceneTextureNode = texture(); // Active scene (e.g., meadow)
