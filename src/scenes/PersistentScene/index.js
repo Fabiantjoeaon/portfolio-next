@@ -1,4 +1,17 @@
 import * as THREE from "three/webgpu";
+import { NodeMaterial } from "three/webgpu";
+import {
+  uniform,
+  uv,
+  vec3,
+  vec4,
+  float,
+  sin,
+  cos,
+  mix,
+  time,
+  Fn,
+} from "three/tsl";
 import { Grid } from "./Grid/index.js";
 import { GBuffer } from "../../graphics/GBuffer.js";
 
@@ -17,13 +30,16 @@ export default class PersistentScene {
   constructor(renderer, width, height, devicePixelRatio = 1) {
     this.renderer = renderer;
     this.scene = new THREE.Scene();
-    //this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     this.testObject = null;
     this.gbuffer = new GBuffer(width, height, devicePixelRatio);
     this.grid = null;
+    this.backgroundPlane = null;
 
     // Add lighting to the persistent scene
-    this._setupLighting();
+    // this._setupLighting();
+
+    // Initialize background plane
+    this._setupBackground();
 
     // Initialize grid
     this._setupGrid();
@@ -34,15 +50,14 @@ export default class PersistentScene {
    */
   _setupGrid() {
     this.grid = new Grid({
-      tileSize: 0.8,
-      gap: 0.35,
+      size: 16, // Number of columns (rows auto-calculated from aspect ratio)
+      gap: 0.37,
       cornerRadius: 0.12,
       depth: 0.08,
       bevel: {
         enabled: true,
         thickness: 0.1,
         size: 0.085,
-        // Determines soft/smoothness
         segments: 1,
       },
       color: 0xffffff,
@@ -51,21 +66,91 @@ export default class PersistentScene {
       position: new THREE.Vector3(0, 0, -5), // Behind other content
     });
 
+    // Update background plane when grid rebuilds
+    this.grid.onRebuild((dimensions) => {
+      this._updateBackgroundSize(dimensions);
+    });
+
+    // Initial background size update
+    this._updateBackgroundSize(this.grid.getDimensions());
+
     this.scene.add(this.grid);
   }
 
   /**
-   * Setup basic lighting for the persistent scene
+   * Setup the animated gradient background plane
    */
-  _setupLighting() {
-    // Add ambient light for base illumination
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    this.scene.add(ambientLight);
+  _setupBackground() {
+    // Create plane geometry (will be scaled to match grid)
+    const geometry = new THREE.PlaneGeometry(1, 1);
 
-    // Add directional light for depth
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 5, 5);
-    this.scene.add(directionalLight);
+    // Create material with animated gradient shader
+    const material = new NodeMaterial();
+
+    // Gradient colors - can be customized
+    const color1 = uniform(new THREE.Color(0x1a1a2e)); // Deep blue-purple
+    const color2 = uniform(new THREE.Color(0x16213e)); // Dark navy
+    const color3 = uniform(new THREE.Color(0x0f3460)); // Midnight blue
+    const speed = uniform(0.3);
+
+    material.colorNode = Fn(() => {
+      const uvCoord = uv();
+
+      // Create animated wave pattern
+      const wave1 = sin(uvCoord.y.mul(3.0).add(time.mul(speed)))
+        .mul(0.5)
+        .add(0.5);
+      const wave2 = cos(uvCoord.x.mul(2.0).sub(time.mul(speed.mul(0.7))))
+        .mul(0.5)
+        .add(0.5);
+
+      // Combine waves for organic movement
+      const blend = wave1.mul(0.6).add(wave2.mul(0.4));
+
+      // Create diagonal gradient base
+      const diagonal = uvCoord.x.add(uvCoord.y).mul(0.5);
+
+      // Mix colors based on position and animation
+      const mixedColor1 = mix(vec3(color1), vec3(color2), diagonal);
+      const mixedColor2 = mix(vec3(color2), vec3(color3), blend);
+      const finalColor = mix(
+        mixedColor1,
+        mixedColor2,
+        blend.mul(0.5).add(0.25)
+      );
+
+      return vec4(finalColor, float(1.0));
+    })();
+
+    material.side = THREE.DoubleSide;
+
+    // Store uniforms for external access
+    material.uniforms = {
+      color1,
+      color2,
+      color3,
+      speed,
+    };
+
+    this.backgroundPlane = new THREE.Mesh(geometry, material);
+    this.backgroundPlane.position.z = -6.5; // Behind the grid (grid is at z=-5)
+    this.scene.add(this.backgroundPlane);
+  }
+
+  /**
+   * Update background plane to match grid dimensions
+   * @param {{ width: number, height: number }} dimensions - Grid dimensions
+   * @param {number} padding - Extra padding around the grid
+   */
+  _updateBackgroundSize(dimensions, padding = 1.3) {
+    if (!this.backgroundPlane || !dimensions) return;
+
+    const { width, height } = dimensions;
+    this.backgroundPlane.scale.set(
+      width + padding * 2,
+      height + padding * 2,
+      1
+    );
   }
 
   /**
@@ -152,12 +237,26 @@ export default class PersistentScene {
   }
 
   /**
+   * Get the background plane for external configuration
+   * @returns {THREE.Mesh}
+   */
+  getBackgroundPlane() {
+    return this.backgroundPlane;
+  }
+
+  /**
    * Dispose of all resources
    */
   dispose() {
     if (this.grid) {
       this.grid.dispose();
       this.grid = null;
+    }
+    if (this.backgroundPlane) {
+      this.backgroundPlane.geometry.dispose();
+      this.backgroundPlane.material.dispose();
+      this.scene.remove(this.backgroundPlane);
+      this.backgroundPlane = null;
     }
     if (this.gbuffer) {
       this.gbuffer.dispose();

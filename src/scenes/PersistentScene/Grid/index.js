@@ -10,7 +10,8 @@ import { GridCompute } from "./GridCompute.js";
 export class Grid extends THREE.Group {
   /**
    * @param {Object} config - Grid configuration
-   * @param {number} config.tileSize - Size of each tile in world units
+   * @param {number} config.size - Target number of columns (rows auto-calculated from aspect ratio)
+   * @param {number} config.tileSize - Size of each tile in world units (auto-calculated if size is set)
    * @param {number} config.gap - Gap between tiles in world units
    * @param {number} config.cornerRadius - Corner radius for rounded rectangles
    * @param {number} config.depth - Tile depth/thickness (z-axis)
@@ -24,13 +25,19 @@ export class Grid extends THREE.Group {
     super();
 
     this.config = {
+      size: config.size ?? null, // If set, controls number of columns
+      tileSize: config.tileSize ?? 1.0,
+      gap: config.gap ?? 0.1,
+      cornerRadius: config.cornerRadius ?? 0.1,
+      depth: config.depth ?? 0.15,
+      color: config.color ?? 0xffffff,
+      opacity: config.opacity ?? 1.0,
       bevel: {
         enabled: config.bevel?.enabled ?? true,
-        thickness: config.bevel?.thickness ?? undefined, // auto-calculated if undefined
+        thickness: config.bevel?.thickness ?? undefined,
         size: config.bevel?.size ?? undefined,
         segments: config.bevel?.segments ?? 2,
       },
-
       ...config,
     };
 
@@ -70,17 +77,40 @@ export class Grid extends THREE.Group {
    * @param {Object} viewport - { width, height, devicePixelRatio }
    */
   _onViewportChange(viewport) {
-    const { tileSize, gap } = this.config;
-    const cellSize = tileSize + gap;
+    const { size, gap } = this.config;
 
-    // Calculate how many tiles fit in the viewport
-    // Using a camera-relative calculation assuming orthographic or known FOV
-    // For now, use a simple pixel-to-world ratio (can be adjusted)
-    const worldWidth = viewport.width * 0.01; // Rough conversion
+    // Convert viewport to world units (rough conversion)
+    const worldWidth = viewport.width * 0.01;
     const worldHeight = viewport.height * 0.01;
+    const aspectRatio = worldWidth / worldHeight;
 
-    const newCols = Math.floor(worldWidth / cellSize);
-    const newRows = Math.floor(worldHeight / cellSize);
+    let newCols, newRows, effectiveTileSize;
+
+    if (size !== null && size > 0) {
+      // Use fixed column count, calculate rows from aspect ratio
+      newCols = size;
+      newRows = Math.max(1, Math.round(size / aspectRatio));
+
+      // Calculate tile size to fill the viewport
+      // cellSize * cols = worldWidth, so tileSize = (worldWidth / cols) - gap
+      const cellSizeX = worldWidth / newCols;
+      const cellSizeY = worldHeight / newRows;
+      const cellSize = Math.min(cellSizeX, cellSizeY);
+      effectiveTileSize = Math.max(0.1, cellSize - gap);
+
+      // Update the computed tile size for other methods
+      this._computedTileSize = effectiveTileSize;
+    } else {
+      // Original behavior: calculate from tileSize
+      const tileSize = this.config.tileSize;
+      const cellSize = tileSize + gap;
+      effectiveTileSize = tileSize;
+      this._computedTileSize = tileSize;
+
+      newCols = Math.floor(worldWidth / cellSize);
+      newRows = Math.floor(worldHeight / cellSize);
+    }
+
     const newCount = newCols * newRows;
 
     // Only rebuild if count changed
@@ -111,8 +141,9 @@ export class Grid extends THREE.Group {
       return;
     }
 
-    const { tileSize, cornerRadius, depth, bevel, color, opacity } =
-      this.config;
+    const { cornerRadius, depth, bevel, color, opacity } = this.config;
+    // Use computed tile size (from size mode) or config tile size
+    const tileSize = this._computedTileSize ?? this.config.tileSize;
 
     // Create geometry and material
     this.geometry = createTileGeometry(tileSize, cornerRadius, depth, 4, bevel);
@@ -151,6 +182,11 @@ export class Grid extends THREE.Group {
     this.geometry.setAttribute("instanceColor", buffers.instanceColor);
 
     this.add(this.mesh);
+
+    // Call rebuild callback if set
+    if (this._onRebuildCallback) {
+      this._onRebuildCallback(this.getDimensions());
+    }
   }
 
   /**
@@ -159,7 +195,8 @@ export class Grid extends THREE.Group {
   _updatePositions() {
     if (!this.positionBuffer || this.count <= 0) return;
 
-    const { tileSize, gap } = this.config;
+    const { gap } = this.config;
+    const tileSize = this._computedTileSize ?? this.config.tileSize;
     const cellSize = tileSize + gap;
 
     // Calculate grid dimensions
@@ -202,11 +239,21 @@ export class Grid extends THREE.Group {
   }
 
   /**
-   * Set tile size
-   * @param {number} size - New tile size
+   * Set the grid size (number of columns)
+   * @param {number} size - Number of columns (rows auto-calculated from aspect)
    */
-  setTileSize(size) {
-    this.config.tileSize = size;
+  setSize(size) {
+    this.config.size = size;
+    const { viewport } = useViewportStore.getState();
+    this._onViewportChange(viewport);
+  }
+
+  /**
+   * Set tile size (only works when size config is null)
+   * @param {number} tileSize - New tile size
+   */
+  setTileSize(tileSize) {
+    this.config.tileSize = tileSize;
     const { viewport } = useViewportStore.getState();
     this._onViewportChange(viewport);
   }
@@ -288,11 +335,32 @@ export class Grid extends THREE.Group {
       cols: this.cols,
       rows: this.rows,
       count: this.count,
-      tileSize: this.config.tileSize,
+      size: this.config.size,
+      tileSize: this._computedTileSize ?? this.config.tileSize,
       gap: this.config.gap,
       depth: this.config.depth,
       bevel: this.config.bevel,
     };
+  }
+
+  /**
+   * Get grid dimensions in world units
+   * @returns {{ width: number, height: number }}
+   */
+  getDimensions() {
+    const tileSize = this._computedTileSize ?? this.config.tileSize;
+    const cellSize = tileSize + this.config.gap;
+    const width = this.cols * cellSize - this.config.gap;
+    const height = this.rows * cellSize - this.config.gap;
+    return { width, height };
+  }
+
+  /**
+   * Set callback for when grid rebuilds (useful for syncing other elements)
+   * @param {Function} callback - Function to call after rebuild
+   */
+  onRebuild(callback) {
+    this._onRebuildCallback = callback;
   }
 
   /**
