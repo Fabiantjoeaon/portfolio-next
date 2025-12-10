@@ -149,15 +149,22 @@ export function createTileMaterial(options = {}) {
     const sceneSample = sceneTextureNode.sample(refractedUV);
     const sceneColor = sceneSample.rgb;
 
+    // Get screen alpha for transparency blending
+    const screenAlpha = screenSample.a;
+
     // Sample depth textures (lower value = closer to camera)
     const sceneDepth = sceneDepthNode.sample(refractedUV).x;
     const screenDepth = screenDepthNode.sample(refractedUV).x;
 
-    // Depth-based compositing: show whichever layer is closer
-    // If screen depth < scene depth, screen is in front, show screen
-    // Otherwise show scene
-    const showScreen = screenDepth.lessThan(sceneDepth).toFloat();
-    const compositedColor = mix(sceneColor, screenColor, showScreen);
+    // Depth-based compositing with alpha support:
+    // 1. If screen is in front (screenDepth < sceneDepth), blend screen over scene using screen's alpha
+    // 2. If scene is in front, just show scene
+    const screenInFront = screenDepth.lessThan(sceneDepth).toFloat();
+
+    // When screen is in front: blend screen over scene based on screen alpha
+    // When scene is in front: just show scene (screenInFront = 0)
+    const blendFactor = screenInFront.mul(screenAlpha);
+    const compositedColor = mix(sceneColor, screenColor, blendFactor);
 
     // Calculate fresnel for edge highlights (glass rim effect)
     const viewDir = normalize(sub(cameraPosition, positionWorld));
