@@ -327,12 +327,12 @@ export class Grid extends THREE.Group {
   }
 
   /**
-   * Set the background texture for glass effect sampling
-   * @param {THREE.Texture} texture - The background plane texture
+   * Set the screen texture for glass effect sampling
+   * @param {THREE.Texture} texture - The screen plane texture
    */
-  setBackgroundTexture(texture) {
-    if (this.material?._backgroundTextureNode && texture) {
-      this.material._backgroundTextureNode.value = texture;
+  setScreenTexture(texture) {
+    if (this.material?._screenTextureNode && texture) {
+      this.material._screenTextureNode.value = texture;
     }
   }
 

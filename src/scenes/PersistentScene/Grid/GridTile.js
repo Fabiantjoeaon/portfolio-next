@@ -33,6 +33,10 @@ function createPlaceholderTexture(color = [128, 128, 128, 255]) {
   return tex;
 }
 
+// Placeholder colors
+const TRANSPARENT_BLACK = [0, 0, 0, 0];
+const SCREEN_COLOR = [26, 26, 46, 255]; // Match screen gradient color
+
 /**
  * Creates a rounded rectangle shape
  * @param {number} width - Width of rectangle
@@ -121,12 +125,12 @@ export function createTileMaterial(options = {}) {
 
   // Create placeholder textures for proper shader compilation
   // These will be replaced with actual textures during rendering
-  const scenePlaceholder = createPlaceholderTexture([0, 0, 0, 0]); // Transparent black
-  const bgPlaceholder = createPlaceholderTexture([26, 26, 46, 255]); // Match background color
+  const scenePlaceholder = createPlaceholderTexture(TRANSPARENT_BLACK);
+  const screenPlaceholder = createPlaceholderTexture(SCREEN_COLOR);
 
   // Two texture sources for layered refraction
   const sceneTextureNode = texture(scenePlaceholder); // Active scene (e.g., meadow)
-  const backgroundTextureNode = texture(bgPlaceholder); // Persistent background plane
+  const screenTextureNode = texture(screenPlaceholder); // Persistent screen plane
 
   // Instance attributes - these will be set by the InstancedMesh
   // instancePosition: base grid position (vec3)
@@ -152,18 +156,18 @@ export function createTileMaterial(options = {}) {
     const distortion = normal.xy.mul(refractionStrength);
     const refractedUV = screenUV.add(distortion);
 
-    // Sample background texture (gradient plane behind tiles)
-    const bgSample = backgroundTextureNode.sample(refractedUV);
-    const bgColor = bgSample.rgb;
+    // Sample screen texture (gradient plane behind tiles)
+    const screenSample = screenTextureNode.sample(refractedUV);
+    const screenColor = screenSample.rgb;
 
     // Sample scene texture (active scene content)
     const sceneSample = sceneTextureNode.sample(refractedUV);
     const sceneColor = sceneSample.rgb;
     const sceneAlpha = sceneSample.a;
 
-    // Composite: scene over background using scene's alpha
-    // Where scene has content (alpha > 0), show scene; otherwise show background
-    const compositedColor = mix(bgColor, sceneColor, sceneAlpha);
+    // Composite: scene over screen using scene's alpha
+    // Where scene has content (alpha > 0), show scene; otherwise show screen
+    const compositedColor = mix(screenColor, sceneColor, sceneAlpha);
 
     // Calculate fresnel for edge highlights (glass rim effect)
     const viewDir = normalize(sub(cameraPosition, positionWorld));
@@ -202,7 +206,7 @@ export function createTileMaterial(options = {}) {
 
   // Store texture nodes separately for updating
   material._sceneTextureNode = sceneTextureNode;
-  material._backgroundTextureNode = backgroundTextureNode;
+  material._screenTextureNode = screenTextureNode;
 
   return material;
 }

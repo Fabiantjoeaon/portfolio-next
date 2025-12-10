@@ -126,22 +126,24 @@ export class SceneManager {
     renderer.autoClear = false;
 
     // ═══════════════════════════════════════════════════════════════════════
-    // STEP 1: Render persistent background FIRST
+    // STEP 1: Render persistent screen FIRST
     // This allows glass tiles to sample it for refraction
     // ═══════════════════════════════════════════════════════════════════════
     if (!this.hidePersistentScene) {
-      this.persistent.renderBackground(camera);
+      this.persistent.renderScreen(camera);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // STEP 2: Pass persistent scene to active scenes for reflections
+    // STEP 2: Pass persistent scenes to active scenes for reflections
+    // Pass both the main scene (tiles) and screen scene (gradient plane)
     // ═══════════════════════════════════════════════════════════════════════
     if (prev?.sceneObj?.setPersistentScene) {
       prev.sceneObj.setPersistentScene(
         this.renderer,
         this.persistent.scene,
         camera,
-        this.viewport
+        this.viewport,
+        this.persistent.screenScene // Also pass screen scene for water reflections
       );
     }
     if (next?.sceneObj?.setPersistentScene) {
@@ -149,7 +151,8 @@ export class SceneManager {
         this.renderer,
         this.persistent.scene,
         camera,
-        this.viewport
+        this.viewport,
+        this.persistent.screenScene // Also pass screen scene for water reflections
       );
     }
 
@@ -222,8 +225,8 @@ export class SceneManager {
       // Pass the active scene's albedo texture to persistent scene for glass sampling
       this.persistent.setSceneTexture(prev?.gbuffer.albedo ?? null);
 
-      // Pass the background texture for glass tiles to sample
-      this.persistent.setBackgroundTexture();
+      // Pass the screen texture for glass tiles to sample
+      this.persistent.setScreenTexture();
 
       if (!this.persistent.isEmpty() && this.persistent.gbuffer) {
         renderer.setRenderTarget(this.persistent.gbuffer.target);
@@ -261,12 +264,10 @@ export class SceneManager {
         persistentDepth: this.hidePersistentScene
           ? null
           : this.persistent.gbuffer?.depth,
-        background: this.hidePersistentScene
+        screen: this.hidePersistentScene ? null : this.persistent.screenTexture,
+        screenDepth: this.hidePersistentScene
           ? null
-          : this.persistent.backgroundTexture,
-        backgroundDepth: this.hidePersistentScene
-          ? null
-          : this.persistent.backgroundDepth,
+          : this.persistent.screenDepth,
       });
     }
 

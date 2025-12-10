@@ -20,7 +20,7 @@ import { GBuffer } from "../../graphics/GBuffer.js";
  * These objects are rendered into their own gbuffer and composited
  * with depth testing to maintain proper occlusion.
  *
- * The background plane is rendered separately so glass tiles can sample it.
+ * The screen plane is rendered separately so glass tiles can sample it.
  */
 export default class PersistentScene {
   /**
@@ -32,36 +32,38 @@ export default class PersistentScene {
   constructor(renderer, width, height, devicePixelRatio = 1) {
     this.renderer = renderer;
     this._devicePixelRatio = devicePixelRatio;
+    this._viewportWidth = width;
+    this._viewportHeight = height;
 
     // Main scene for foreground elements (grid tiles)
     this.scene = new THREE.Scene();
 
-    // Separate scene for background (rendered first, sampled by tiles)
-    this.backgroundScene = new THREE.Scene();
+    // Separate scene for screen/background plane (rendered first, sampled by tiles)
+    this.screenScene = new THREE.Scene();
 
     this.testObject = null;
     this.gbuffer = new GBuffer(width, height, devicePixelRatio);
     this.grid = null;
-    this.backgroundPlane = null;
+    this.screenPlane = null;
 
-    // Create background render target
-    this._createBackgroundTarget(width, height, devicePixelRatio);
+    // Create screen render target
+    this._createScreenTarget(width, height, devicePixelRatio);
 
-    // Initialize background plane (in backgroundScene)
-    this._setupBackground();
+    // Initialize screen plane (in screenScene)
+    this._setupScreen();
 
     // Initialize grid (in main scene)
     this._setupGrid();
   }
 
   /**
-   * Create render target for background with depth
+   * Create render target for screen with depth
    */
-  _createBackgroundTarget(width, height, devicePixelRatio) {
+  _createScreenTarget(width, height, devicePixelRatio) {
     const w = Math.max(1, Math.floor(width * devicePixelRatio));
     const h = Math.max(1, Math.floor(height * devicePixelRatio));
 
-    this.backgroundTarget = new RenderTarget(w, h, {
+    this.screenTarget = new RenderTarget(w, h, {
       type: HalfFloatType,
       depthBuffer: true,
       minFilter: THREE.LinearFilter,
@@ -69,25 +71,25 @@ export default class PersistentScene {
     });
 
     // Add depth texture for sampling in post-processing
-    this.backgroundTarget.depthTexture = new THREE.DepthTexture(w, h);
-    this.backgroundTarget.depthTexture.format = THREE.DepthFormat;
-    this.backgroundTarget.depthTexture.type = THREE.UnsignedIntType;
+    this.screenTarget.depthTexture = new THREE.DepthTexture(w, h);
+    this.screenTarget.depthTexture.format = THREE.DepthFormat;
+    this.screenTarget.depthTexture.type = THREE.UnsignedIntType;
   }
 
   /**
-   * Get the background texture for sampling
+   * Get the screen texture for sampling
    * @returns {THREE.Texture}
    */
-  get backgroundTexture() {
-    return this.backgroundTarget?.texture ?? null;
+  get screenTexture() {
+    return this.screenTarget?.texture ?? null;
   }
 
   /**
-   * Get the background depth texture for depth compositing
+   * Get the screen depth texture for depth compositing
    * @returns {THREE.DepthTexture}
    */
-  get backgroundDepth() {
-    return this.backgroundTarget?.depthTexture ?? null;
+  get screenDepth() {
+    return this.screenTarget?.depthTexture ?? null;
   }
 
   /**
@@ -111,21 +113,21 @@ export default class PersistentScene {
       position: new THREE.Vector3(0, 0, -5), // Behind other content
     });
 
-    // Update background plane when grid rebuilds
+    // Update screen plane when grid rebuilds
     this.grid.onRebuild((dimensions) => {
-      this._updateBackgroundSize(dimensions);
+      this._updateScreenSize(dimensions);
     });
 
-    // Initial background size update
-    this._updateBackgroundSize(this.grid.getDimensions());
+    // Initial screen size update
+    this._updateScreenSize(this.grid.getDimensions());
 
     this.scene.add(this.grid);
   }
 
   /**
-   * Setup the animated gradient background plane
+   * Setup the animated gradient screen plane
    */
-  _setupBackground() {
+  _setupScreen() {
     // Create plane geometry (will be scaled to match grid)
     const geometry = new THREE.PlaneGeometry(1, 1);
 
@@ -177,27 +179,27 @@ export default class PersistentScene {
       speed,
     };
 
-    this.backgroundPlane = new THREE.Mesh(geometry, material);
-    this.backgroundPlane.position.z = -6.5; // Behind the grid (grid is at z=-5)
-    // Add to separate background scene (not main scene)
-    this.backgroundScene.add(this.backgroundPlane);
+    this.screenPlane = new THREE.Mesh(geometry, material);
+    this.screenPlane.position.z = -6.5; // Behind the grid (grid is at z=-5)
+    // Add to separate screen scene (not main scene)
+    this.screenScene.add(this.screenPlane);
   }
 
   /**
-   * Update background plane to match grid dimensions
+   * Update screen plane to match grid dimensions
    * @param {{ width: number, height: number }} dimensions - Grid dimensions
    * @param {number} padding - Extra padding around the grid
    */
-  _updateBackgroundSize(dimensions, padding = 1.3) {
-    if (!this.backgroundPlane || !dimensions) return;
+  _updateScreenSize(dimensions, padding = 1.3) {
+    if (!this.screenPlane || !dimensions) return;
 
     const { width, height } = dimensions;
-    // Ensure background is large enough to fill the view
+    // Ensure screen is large enough to fill the view
     // At z=-6.5 from camera at z=5 with 75deg FOV, we need ~20+ units
     const minSize = 30;
-    const bgWidth = Math.max(width + padding * 2, minSize);
-    const bgHeight = Math.max(height + padding * 2, minSize);
-    this.backgroundPlane.scale.set(bgWidth, bgHeight, 1);
+    const screenWidth = Math.max(width + padding * 2, minSize);
+    const screenHeight = Math.max(height + padding * 2, minSize);
+    this.screenPlane.scale.set(screenWidth, screenHeight, 1);
   }
 
   /**
@@ -266,22 +268,22 @@ export default class PersistentScene {
   }
 
   /**
-   * Render the background to its own render target
+   * Render the screen to its own render target
    * Call this BEFORE rendering active scenes so tiles can sample it
    * @param {THREE.Camera} camera - The camera to render with
    */
-  renderBackground(camera) {
-    if (!this.backgroundTarget || !this.renderer) return;
+  renderScreen(camera) {
+    if (!this.screenTarget || !this.renderer) return;
 
     const currentTarget = this.renderer.getRenderTarget();
     const currentAutoClear = this.renderer.autoClear;
 
-    this.renderer.setRenderTarget(this.backgroundTarget);
+    this.renderer.setRenderTarget(this.screenTarget);
     this.renderer.autoClear = true;
     // Clear with transparent - only the gradient plane will have color
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.clear();
-    this.renderer.render(this.backgroundScene, camera);
+    this.renderer.render(this.screenScene, camera);
 
     this.renderer.setRenderTarget(currentTarget);
     this.renderer.autoClear = currentAutoClear;
@@ -295,12 +297,14 @@ export default class PersistentScene {
    */
   resize(width, height, devicePixelRatio = this._devicePixelRatio) {
     this._devicePixelRatio = devicePixelRatio;
+    this._viewportWidth = width;
+    this._viewportHeight = height;
 
-    // Resize background target
-    if (this.backgroundTarget) {
-      this.backgroundTarget.dispose();
+    // Resize screen target
+    if (this.screenTarget) {
+      this.screenTarget.dispose();
     }
-    this._createBackgroundTarget(width, height, devicePixelRatio);
+    this._createScreenTarget(width, height, devicePixelRatio);
 
     // Resize gbuffer
     if (this.gbuffer) {
@@ -327,22 +331,33 @@ export default class PersistentScene {
   }
 
   /**
-   * Set the background texture for glass effect sampling
-   * @param {THREE.Texture} texture - The background texture (or null to use internal)
+   * Set the screen texture for glass effect sampling
+   * @param {THREE.Texture} texture - The screen texture (or null to use internal)
    */
-  setBackgroundTexture(texture = null) {
+  setScreenTexture(texture = null) {
     if (this.grid) {
-      // Use provided texture or fall back to internal background render
-      this.grid.setBackgroundTexture(texture ?? this.backgroundTexture);
+      // Use provided texture or fall back to internal screen render
+      this.grid.setScreenTexture(texture ?? this.screenTexture);
     }
   }
 
   /**
-   * Get the background plane for external configuration
+   * Get the screen plane for external configuration
    * @returns {THREE.Mesh}
    */
-  getBackgroundPlane() {
-    return this.backgroundPlane;
+  getScreenPlane() {
+    return this.screenPlane;
+  }
+
+  /**
+   * Get the combined scene for water reflections (includes screen plane)
+   * This returns a scene that includes both the screen plane and the grid
+   * @returns {THREE.Scene}
+   */
+  getReflectionScene() {
+    // Return the screen scene which has the gradient plane
+    // The water can reflect this along with the main scene
+    return this.screenScene;
   }
 
   /**
@@ -353,15 +368,15 @@ export default class PersistentScene {
       this.grid.dispose();
       this.grid = null;
     }
-    if (this.backgroundPlane) {
-      this.backgroundPlane.geometry.dispose();
-      this.backgroundPlane.material.dispose();
-      this.backgroundScene.remove(this.backgroundPlane);
-      this.backgroundPlane = null;
+    if (this.screenPlane) {
+      this.screenPlane.geometry.dispose();
+      this.screenPlane.material.dispose();
+      this.screenScene.remove(this.screenPlane);
+      this.screenPlane = null;
     }
-    if (this.backgroundTarget) {
-      this.backgroundTarget.dispose();
-      this.backgroundTarget = null;
+    if (this.screenTarget) {
+      this.screenTarget.dispose();
+      this.screenTarget = null;
     }
     if (this.gbuffer) {
       this.gbuffer.dispose();

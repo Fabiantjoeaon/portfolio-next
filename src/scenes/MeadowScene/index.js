@@ -70,14 +70,27 @@ export default class MeadowScene extends BaseScene {
     this.scene.add(directionalLight);
   }
 
-  setPersistentScene(renderer, persistentScene, camera, viewport) {
-    if (!this.water || !persistentScene?.children.length) return;
+  setPersistentScene(renderer, persistentScene, camera, viewport, screenScene) {
+    if (!this.water) return;
+
+    // Need at least one scene to reflect
+    const hasContent =
+      persistentScene?.children?.length > 0 ||
+      screenScene?.children?.length > 0;
+    if (!hasContent) return;
 
     if (!this._externalSceneInitialized) {
       const { width, height, devicePixelRatio } = viewport;
       const w = Math.round(width * devicePixelRatio * 0.5);
       const h = Math.round(height * devicePixelRatio * 0.5);
-      this.water.setExternalScene(renderer, persistentScene, w, h);
+      // Pass both scenes - water will render them both
+      this.water.setExternalScenes(
+        renderer,
+        persistentScene,
+        screenScene,
+        w,
+        h
+      );
       this._externalSceneInitialized = true;
     }
 

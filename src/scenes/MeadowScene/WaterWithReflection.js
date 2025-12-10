@@ -61,6 +61,7 @@ export class WaterWithReflection extends Mesh {
     // External reflection setup
     this._renderer = null;
     this._externalScene = null;
+    this._screenScene = null; // Screen/background scene for gradient plane
     this._reflectionTarget = null;
     this._virtualCamera = new PerspectiveCamera();
 
@@ -209,15 +210,34 @@ export class WaterWithReflection extends Mesh {
   }
 
   /**
-   * Set up external scene reflection
+   * Set up external scene reflection (legacy - single scene)
    * @param {THREE.WebGPURenderer} renderer - The renderer
    * @param {THREE.Scene} externalScene - The scene to reflect (e.g., persistent scene)
    * @param {number} width - Render target width
    * @param {number} height - Render target height
    */
   setExternalScene(renderer, externalScene, width = 512, height = 512) {
+    this.setExternalScenes(renderer, externalScene, null, width, height);
+  }
+
+  /**
+   * Set up external scenes reflection (supports screen + persistent scenes)
+   * @param {THREE.WebGPURenderer} renderer - The renderer
+   * @param {THREE.Scene} externalScene - The main persistent scene (tiles, etc.)
+   * @param {THREE.Scene} screenScene - The screen scene (gradient plane)
+   * @param {number} width - Render target width
+   * @param {number} height - Render target height
+   */
+  setExternalScenes(
+    renderer,
+    externalScene,
+    screenScene,
+    width = 512,
+    height = 512
+  ) {
     this._renderer = renderer;
     this._externalScene = externalScene;
+    this._screenScene = screenScene;
 
     // Create reflection render target if needed
     if (!this._reflectionTarget) {
@@ -287,7 +307,12 @@ export class WaterWithReflection extends Mesh {
    * @param {THREE.Camera} camera - The main camera
    */
   renderExternalReflection(camera) {
-    if (!this._renderer || !this._externalScene || !this._reflectionTarget) {
+    if (!this._renderer || !this._reflectionTarget) {
+      return;
+    }
+
+    // Need at least one scene
+    if (!this._externalScene && !this._screenScene) {
       return;
     }
 
@@ -295,23 +320,39 @@ export class WaterWithReflection extends Mesh {
 
     // Disable frustum culling for mirrored camera render
     const cullingStates = [];
-    this._externalScene.traverse((obj) => {
-      if (obj.isMesh || obj.isLine || obj.isPoints) {
-        cullingStates.push({ obj, frustumCulled: obj.frustumCulled });
-        obj.frustumCulled = false;
-      }
-    });
+    const disableCulling = (scene) => {
+      if (!scene) return;
+      scene.traverse((obj) => {
+        if (obj.isMesh || obj.isLine || obj.isPoints) {
+          cullingStates.push({ obj, frustumCulled: obj.frustumCulled });
+          obj.frustumCulled = false;
+        }
+      });
+    };
+    disableCulling(this._externalScene);
+    disableCulling(this._screenScene);
 
     // Store current state
     const currentRenderTarget = this._renderer.getRenderTarget();
     const currentAutoClear = this._renderer.autoClear;
 
-    // Render external scene from mirrored camera
+    // Render to reflection target
     this._renderer.setRenderTarget(this._reflectionTarget);
     this._renderer.autoClear = true;
     this._renderer.setClearColor(0x000000, 0);
     this._renderer.clear();
-    this._renderer.render(this._externalScene, this._virtualCamera);
+
+    // Render screen scene FIRST (it's behind everything)
+    if (this._screenScene) {
+      this._renderer.render(this._screenScene, this._virtualCamera);
+    }
+
+    // Render main external scene on top (tiles, etc.)
+    // Don't clear so it layers over the screen
+    if (this._externalScene) {
+      this._renderer.autoClear = false;
+      this._renderer.render(this._externalScene, this._virtualCamera);
+    }
 
     // Restore state
     this._renderer.setRenderTarget(currentRenderTarget);
