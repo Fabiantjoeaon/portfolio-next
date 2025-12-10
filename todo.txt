@@ -6,6 +6,24 @@ RENDER PLAN:
 - the water should be able to refract/reflect everything from active scene to persistent scene (currently implemented)
 - each scene can have custom post processing (currently implemented), this does not have to affect persistent scene (if its not at extra performance cost its fine to affect is as well), but the persistent scene is always rendered to depth buffer that can be used by post processing so it can be taken into account for for screen space effects
 
+flowchart TD
+    subgraph current [Current Flow]
+        A1[Active Scene] --> G1[Active GBuffer]
+        P1[Persistent Scene<br/>background + tiles] --> G2[Persistent GBuffer]
+        G1 --> Post1[Post Process]
+        G2 --> Post1
+    end
+    
+    subgraph new [New Flow]
+        BG[Background Plane] --> BG_TEX[Background Texture]
+        A2[Active Scene] --> G3[Active GBuffer]
+        BG_TEX --> TILES[Glass Tiles]
+        G3 --> TILES
+        TILES --> G4[Persistent GBuffer]
+        G3 --> Post2[Post Process]
+        G4 --> Post2
+    end
+
 
 // DOC: https://threejs.org/docs/#TSL
 
@@ -121,12 +139,3 @@ Render those passes only for scenes that use them.
 This way Option A is still your backbone (one main post pass), and your heavy screen‑space effects are completely absent—not just “if’d off”—for scenes that don’t need them.
 
 
-flowchart TD
-    subgraph render_order [Render Order]
-        A[1. Background Plane] -->|renders to| BG[backgroundTarget]
-        B[2. Active Scene] -->|renders to| SC[scene.gbuffer]
-        C[3. Grid Tiles] -->|renders to| PG[persistent.gbuffer]
-        C -->|samples| BG
-        C -->|samples| SC
-        D[4. Post-Process] -->|composites| OUT[Screen]
-    end

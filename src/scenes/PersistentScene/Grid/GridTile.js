@@ -1,5 +1,5 @@
 import * as THREE from "three/webgpu";
-import { NodeMaterial } from "three/webgpu";
+import { NodeMaterial, DataTexture, RGBAFormat } from "three/webgpu";
 import {
   attribute,
   positionLocal,
@@ -24,6 +24,14 @@ import {
   texture,
   Fn,
 } from "three/tsl";
+
+// Create a small placeholder texture for initial shader compilation
+function createPlaceholderTexture(color = [128, 128, 128, 255]) {
+  const data = new Uint8Array(color);
+  const tex = new DataTexture(data, 1, 1, RGBAFormat);
+  tex.needsUpdate = true;
+  return tex;
+}
 
 /**
  * Creates a rounded rectangle shape
@@ -93,7 +101,10 @@ export function createTileGeometry(
 /**
  * Creates a TSL NodeMaterial for the grid tiles with glass refraction effect
  * Accepts instance attributes for position, offset, scale, and color
- * Samples the scene texture with normal-based distortion for glass look
+ * Samples BOTH background and scene textures for layered refraction:
+ * - Background: the animated gradient plane behind the tiles
+ * - Scene: the active scene content (meadow, etc.)
+ * Scene is composited over background based on scene alpha.
  * @param {Object} options - Material options
  * @returns {NodeMaterial}
  */
@@ -108,7 +119,14 @@ export function createTileMaterial(options = {}) {
   const fresnelPower = uniform(options.fresnelPower ?? 3.0);
   const tintStrength = uniform(options.tintStrength ?? 0.15);
 
-  const sceneTextureNode = texture();
+  // Create placeholder textures for proper shader compilation
+  // These will be replaced with actual textures during rendering
+  const scenePlaceholder = createPlaceholderTexture([0, 0, 0, 0]); // Transparent black
+  const bgPlaceholder = createPlaceholderTexture([26, 26, 46, 255]); // Match background color
+
+  // Two texture sources for layered refraction
+  const sceneTextureNode = texture(scenePlaceholder); // Active scene (e.g., meadow)
+  const backgroundTextureNode = texture(bgPlaceholder); // Persistent background plane
 
   // Instance attributes - these will be set by the InstancedMesh
   // instancePosition: base grid position (vec3)
@@ -134,8 +152,18 @@ export function createTileMaterial(options = {}) {
     const distortion = normal.xy.mul(refractionStrength);
     const refractedUV = screenUV.add(distortion);
 
-    // Sample scene texture with distorted UVs using the texture node's uv method
-    const sceneColor = sceneTextureNode.sample(refractedUV).rgb;
+    // Sample background texture (gradient plane behind tiles)
+    const bgSample = backgroundTextureNode.sample(refractedUV);
+    const bgColor = bgSample.rgb;
+
+    // Sample scene texture (active scene content)
+    const sceneSample = sceneTextureNode.sample(refractedUV);
+    const sceneColor = sceneSample.rgb;
+    const sceneAlpha = sceneSample.a;
+
+    // Composite: scene over background using scene's alpha
+    // Where scene has content (alpha > 0), show scene; otherwise show background
+    const compositedColor = mix(bgColor, sceneColor, sceneAlpha);
 
     // Calculate fresnel for edge highlights (glass rim effect)
     const viewDir = normalize(sub(cameraPosition, positionWorld));
@@ -145,8 +173,8 @@ export function createTileMaterial(options = {}) {
     // Base tint color from instance and base color
     const tintColor = mul(vec3(baseColorUniform), instanceColor.xyz);
 
-    // Blend scene color with tint
-    const tintedScene = mix(sceneColor, tintColor, tintStrength);
+    // Blend composited color with tint
+    const tintedScene = mix(compositedColor, tintColor, tintStrength);
 
     // Add fresnel rim highlight
     const rimColor = vec3(1.0, 1.0, 1.0);
@@ -163,7 +191,7 @@ export function createTileMaterial(options = {}) {
   material.side = THREE.DoubleSide;
   material.depthWrite = options.depthWrite ?? true;
 
-  // Store uniforms and texture node for external access
+  // Store uniforms and texture nodes for external access
   material.uniforms = {
     baseColor: baseColorUniform,
     opacity: opacityUniform,
@@ -172,8 +200,9 @@ export function createTileMaterial(options = {}) {
     tintStrength,
   };
 
-  // Store texture node separately for updating
+  // Store texture nodes separately for updating
   material._sceneTextureNode = sceneTextureNode;
+  material._backgroundTextureNode = backgroundTextureNode;
 
   return material;
 }

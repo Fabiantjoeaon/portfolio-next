@@ -1,5 +1,5 @@
 import * as THREE from "three/webgpu";
-import { NodeMaterial } from "three/webgpu";
+import { NodeMaterial, RenderTarget, HalfFloatType } from "three/webgpu";
 import {
   uniform,
   uv,
@@ -19,6 +19,8 @@ import { GBuffer } from "../../graphics/GBuffer.js";
  * Manages objects that persist across all scenes.
  * These objects are rendered into their own gbuffer and composited
  * with depth testing to maintain proper occlusion.
+ *
+ * The background plane is rendered separately so glass tiles can sample it.
  */
 export default class PersistentScene {
   /**
@@ -29,20 +31,63 @@ export default class PersistentScene {
    */
   constructor(renderer, width, height, devicePixelRatio = 1) {
     this.renderer = renderer;
+    this._devicePixelRatio = devicePixelRatio;
+
+    // Main scene for foreground elements (grid tiles)
     this.scene = new THREE.Scene();
+
+    // Separate scene for background (rendered first, sampled by tiles)
+    this.backgroundScene = new THREE.Scene();
+
     this.testObject = null;
     this.gbuffer = new GBuffer(width, height, devicePixelRatio);
     this.grid = null;
     this.backgroundPlane = null;
 
-    // Add lighting to the persistent scene
-    // this._setupLighting();
+    // Create background render target
+    this._createBackgroundTarget(width, height, devicePixelRatio);
 
-    // Initialize background plane
+    // Initialize background plane (in backgroundScene)
     this._setupBackground();
 
-    // Initialize grid
+    // Initialize grid (in main scene)
     this._setupGrid();
+  }
+
+  /**
+   * Create render target for background with depth
+   */
+  _createBackgroundTarget(width, height, devicePixelRatio) {
+    const w = Math.max(1, Math.floor(width * devicePixelRatio));
+    const h = Math.max(1, Math.floor(height * devicePixelRatio));
+
+    this.backgroundTarget = new RenderTarget(w, h, {
+      type: HalfFloatType,
+      depthBuffer: true,
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+    });
+
+    // Add depth texture for sampling in post-processing
+    this.backgroundTarget.depthTexture = new THREE.DepthTexture(w, h);
+    this.backgroundTarget.depthTexture.format = THREE.DepthFormat;
+    this.backgroundTarget.depthTexture.type = THREE.UnsignedIntType;
+  }
+
+  /**
+   * Get the background texture for sampling
+   * @returns {THREE.Texture}
+   */
+  get backgroundTexture() {
+    return this.backgroundTarget?.texture ?? null;
+  }
+
+  /**
+   * Get the background depth texture for depth compositing
+   * @returns {THREE.DepthTexture}
+   */
+  get backgroundDepth() {
+    return this.backgroundTarget?.depthTexture ?? null;
   }
 
   /**
@@ -134,7 +179,8 @@ export default class PersistentScene {
 
     this.backgroundPlane = new THREE.Mesh(geometry, material);
     this.backgroundPlane.position.z = -6.5; // Behind the grid (grid is at z=-5)
-    this.scene.add(this.backgroundPlane);
+    // Add to separate background scene (not main scene)
+    this.backgroundScene.add(this.backgroundPlane);
   }
 
   /**
@@ -146,11 +192,12 @@ export default class PersistentScene {
     if (!this.backgroundPlane || !dimensions) return;
 
     const { width, height } = dimensions;
-    this.backgroundPlane.scale.set(
-      width + padding * 2,
-      height + padding * 2,
-      1
-    );
+    // Ensure background is large enough to fill the view
+    // At z=-6.5 from camera at z=5 with 75deg FOV, we need ~20+ units
+    const minSize = 30;
+    const bgWidth = Math.max(width + padding * 2, minSize);
+    const bgHeight = Math.max(height + padding * 2, minSize);
+    this.backgroundPlane.scale.set(bgWidth, bgHeight, 1);
   }
 
   /**
@@ -219,6 +266,49 @@ export default class PersistentScene {
   }
 
   /**
+   * Render the background to its own render target
+   * Call this BEFORE rendering active scenes so tiles can sample it
+   * @param {THREE.Camera} camera - The camera to render with
+   */
+  renderBackground(camera) {
+    if (!this.backgroundTarget || !this.renderer) return;
+
+    const currentTarget = this.renderer.getRenderTarget();
+    const currentAutoClear = this.renderer.autoClear;
+
+    this.renderer.setRenderTarget(this.backgroundTarget);
+    this.renderer.autoClear = true;
+    // Clear with transparent - only the gradient plane will have color
+    this.renderer.setClearColor(0x000000, 0);
+    this.renderer.clear();
+    this.renderer.render(this.backgroundScene, camera);
+
+    this.renderer.setRenderTarget(currentTarget);
+    this.renderer.autoClear = currentAutoClear;
+  }
+
+  /**
+   * Resize render targets
+   * @param {number} width
+   * @param {number} height
+   * @param {number} devicePixelRatio
+   */
+  resize(width, height, devicePixelRatio = this._devicePixelRatio) {
+    this._devicePixelRatio = devicePixelRatio;
+
+    // Resize background target
+    if (this.backgroundTarget) {
+      this.backgroundTarget.dispose();
+    }
+    this._createBackgroundTarget(width, height, devicePixelRatio);
+
+    // Resize gbuffer
+    if (this.gbuffer) {
+      this.gbuffer.resize(width, height, devicePixelRatio);
+    }
+  }
+
+  /**
    * Get the grid instance for external configuration
    * @returns {Grid}
    */
@@ -233,6 +323,17 @@ export default class PersistentScene {
   setSceneTexture(texture) {
     if (this.grid) {
       this.grid.setSceneTexture(texture);
+    }
+  }
+
+  /**
+   * Set the background texture for glass effect sampling
+   * @param {THREE.Texture} texture - The background texture (or null to use internal)
+   */
+  setBackgroundTexture(texture = null) {
+    if (this.grid) {
+      // Use provided texture or fall back to internal background render
+      this.grid.setBackgroundTexture(texture ?? this.backgroundTexture);
     }
   }
 
@@ -255,8 +356,12 @@ export default class PersistentScene {
     if (this.backgroundPlane) {
       this.backgroundPlane.geometry.dispose();
       this.backgroundPlane.material.dispose();
-      this.scene.remove(this.backgroundPlane);
+      this.backgroundScene.remove(this.backgroundPlane);
       this.backgroundPlane = null;
+    }
+    if (this.backgroundTarget) {
+      this.backgroundTarget.dispose();
+      this.backgroundTarget = null;
     }
     if (this.gbuffer) {
       this.gbuffer.dispose();

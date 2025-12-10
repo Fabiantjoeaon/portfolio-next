@@ -1,10 +1,15 @@
-import { texture, uv, uniform, vec3, mix, step } from "three/tsl";
+import { texture, uv, uniform, vec3, mix, step, float, min } from "three/tsl";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 
 /**
- * Fullscreen post material that blends two scenes (prev/next).
- * Exposes setters for inputs and a mix value (0..1).
- * Normals and depth are accepted for future effects; not required for basic blend.
+ * Fullscreen post material that blends scenes with proper depth compositing.
+ * Uses a unified depth approach: min(backgroundDepth, persistentDepth) creates
+ * a single "persistent layer depth" that's compared against scene depth.
+ *
+ * Compositing order (back to front):
+ * 1. Background (persistent scene gradient plane)
+ * 2. Active scene (prev/next blended)
+ * 3. Persistent scene foreground (glass tiles)
  */
 export class PostProcessingMaterial {
   constructor() {
@@ -22,6 +27,8 @@ export class PostProcessingMaterial {
     this.nextDepth = null;
     this.persistentTex = null;
     this.persistentDepth = null;
+    this.backgroundTex = null;
+    this.backgroundDepthTex = null;
 
     this.transition = null;
     this.postprocessingChain = null;
@@ -32,8 +39,18 @@ export class PostProcessingMaterial {
   }
 
   rebuildGraph() {
+    // DEBUG: Set to true to visualize background texture directly
+    const debugShowBackground = false;
+
+    if (debugShowBackground && this.backgroundTex) {
+      this.material.colorNode = texture(this.backgroundTex, this.uvNode);
+      this.material.needsUpdate = true;
+      return;
+    }
+
     if (this.prevTex && this.nextTex && this.transition) {
-      let colorNode = this.transition.buildColorNode({
+      // Get the active scene blend (prev/next transition)
+      const sceneColorNode = this.transition.buildColorNode({
         uvNode: this.uvNode,
         mixNode: this.mixNode,
         prevTex: this.prevTex,
@@ -44,31 +61,93 @@ export class PostProcessingMaterial {
         nextDepth: this.nextDepth,
       });
 
-      // Composite persistent layer with depth testing (before postprocessing)
-      if (this.persistentTex && this.persistentDepth && this.prevDepth) {
-        const persistentSample = texture(this.persistentTex, this.uvNode);
-        const persistentDepthSample = texture(
-          this.persistentDepth,
-          this.uvNode
-        ).x;
+      // Start with scene color as base
+      let colorNode = sceneColorNode;
 
-        // Blend scene depths based on transition mix
-        const prevDepthSample = texture(this.prevDepth, this.uvNode).x;
-        const blendedDepth = this.nextDepth
-          ? mix(
-              prevDepthSample,
-              texture(this.nextDepth, this.uvNode).x,
-              this.mixNode
-            )
-          : prevDepthSample;
+      // ═══════════════════════════════════════════════════════════════════
+      // UNIFIED DEPTH APPROACH
+      // Combine background depth + persistent (tiles) depth into one
+      // Compare unified persistent depth against scene depth
+      // ═══════════════════════════════════════════════════════════════════
 
-        // Depth test: if persistent is closer (smaller depth), use persistent color
-        // step(a, b) returns 1 if b >= a, else 0
-        const depthTest = step(persistentDepthSample, blendedDepth);
-        
-        // Only blend persistent if it passes depth test AND has opacity (not background)
-        // If both are at far plane (depth=1), depthTest=1 but persistent.a=0, so we keep scene color
-        colorNode = mix(colorNode, persistentSample.rgb, depthTest.mul(persistentSample.a));
+      // Get blended scene depth (active scene)
+      const prevDepthSample = this.prevDepth
+        ? texture(this.prevDepth, this.uvNode).x
+        : float(1.0);
+      const blendedSceneDepth = this.nextDepth
+        ? mix(
+            prevDepthSample,
+            texture(this.nextDepth, this.uvNode).x,
+            this.mixNode
+          )
+        : prevDepthSample;
+
+      // Get persistent layer depths
+      const tilesDepth = this.persistentDepth
+        ? texture(this.persistentDepth, this.uvNode).x
+        : float(1.0);
+      const bgDepth = this.backgroundDepthTex
+        ? texture(this.backgroundDepthTex, this.uvNode).x
+        : float(1.0);
+
+      // Combined persistent depth = min(background, tiles)
+      // This creates a single depth value for the entire persistent layer
+      const unifiedPersistentDepth = min(tilesDepth, bgDepth);
+
+      // ═══════════════════════════════════════════════════════════════════
+      // COMPOSITING WITH UNIFIED DEPTH
+      // Persistent layer (background + tiles) vs Active scene
+      // ═══════════════════════════════════════════════════════════════════
+
+      // Depth test: is persistent layer closer than scene?
+      // step(a, b) returns 1 if b >= a
+      const persistentCloserThanScene = step(
+        unifiedPersistentDepth,
+        blendedSceneDepth
+      );
+
+      // Sample textures
+      const backgroundSample = this.backgroundTex
+        ? texture(this.backgroundTex, this.uvNode)
+        : null;
+      const persistentSample = this.persistentTex
+        ? texture(this.persistentTex, this.uvNode)
+        : null;
+
+      // Build the persistent layer color:
+      // - Start with background where it exists (alpha > 0)
+      // - Layer tiles on top where they exist (tiles are always in front of background)
+      if (backgroundSample) {
+        // Build persistent layer: background first, then tiles on top
+        let persistentColor = backgroundSample.rgb;
+
+        if (persistentSample) {
+          // Tiles render on top of background based on tile alpha
+          persistentColor = mix(
+            persistentColor,
+            persistentSample.rgb,
+            persistentSample.a
+          );
+        }
+
+        // Composite persistent layer over scene using depth test
+        // Also use background alpha to handle transparent areas
+        const persistentAlpha = backgroundSample.a.max(
+          persistentSample ? persistentSample.a : float(0.0)
+        );
+
+        colorNode = mix(
+          colorNode,
+          persistentColor,
+          persistentCloserThanScene.mul(persistentAlpha)
+        );
+      } else if (persistentSample) {
+        // No background, just tiles
+        colorNode = mix(
+          colorNode,
+          persistentSample.rgb,
+          persistentCloserThanScene.mul(persistentSample.a)
+        );
       }
 
       // Apply optional postprocessing chain after compositing persistent layer
@@ -109,6 +188,8 @@ export class PostProcessingMaterial {
       nextDepth,
       persistent,
       persistentDepth,
+      background,
+      backgroundDepth,
     } = inputs;
     let graphDirty = false;
 
@@ -123,6 +204,17 @@ export class PostProcessingMaterial {
     }
     if (persistent !== undefined && persistent !== this.persistentTex) {
       this.persistentTex = persistent;
+      graphDirty = true;
+    }
+    if (background !== undefined && background !== this.backgroundTex) {
+      this.backgroundTex = background;
+      graphDirty = true;
+    }
+    if (
+      backgroundDepth !== undefined &&
+      backgroundDepth !== this.backgroundDepthTex
+    ) {
+      this.backgroundDepthTex = backgroundDepth;
       graphDirty = true;
     }
 

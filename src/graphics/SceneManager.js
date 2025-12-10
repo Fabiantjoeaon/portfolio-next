@@ -109,8 +109,8 @@ export class SceneManager {
     // Update shared camera aspect
     this.cameraController.setAspect(width / height);
 
-    // Resize persistent gbuffer
-    this.persistent.gbuffer.resize(width, height, devicePixelRatio);
+    // Resize persistent scene (includes gbuffer and background target)
+    this.persistent.resize(width, height, devicePixelRatio);
   }
 
   render(timeMs, delta) {
@@ -125,8 +125,17 @@ export class SceneManager {
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
 
-    // Pass persistent scene to scenes that need it for reflections
-    // The scene can then render its own reflection pass
+    // ═══════════════════════════════════════════════════════════════════════
+    // STEP 1: Render persistent background FIRST
+    // This allows glass tiles to sample it for refraction
+    // ═══════════════════════════════════════════════════════════════════════
+    if (!this.hidePersistentScene) {
+      this.persistent.renderBackground(camera);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // STEP 2: Pass persistent scene to active scenes for reflections
+    // ═══════════════════════════════════════════════════════════════════════
     if (prev?.sceneObj?.setPersistentScene) {
       prev.sceneObj.setPersistentScene(
         this.renderer,
@@ -152,8 +161,9 @@ export class SceneManager {
       next.sceneObj.setPersistentBuffer(this.persistent.gbuffer);
     }
 
-    // Render active scenes FIRST so their textures are available for persistent scene glass effect
-    // Always update and render the prev scene
+    // ═══════════════════════════════════════════════════════════════════════
+    // STEP 3: Render active scenes
+    // ═══════════════════════════════════════════════════════════════════════
     if (prev?.update) prev.update(timeMs, delta);
     if (prev) {
       renderer.setRenderTarget(prev.gbuffer.target);
@@ -202,12 +212,18 @@ export class SceneManager {
       renderer.setMRT(null);
     }
 
-    // Render persistent scene AFTER active scenes so it can sample their textures for glass effect
+    // ═══════════════════════════════════════════════════════════════════════
+    // STEP 4: Render persistent foreground (glass tiles)
+    // Tiles can now sample both background texture AND active scene texture
+    // ═══════════════════════════════════════════════════════════════════════
     if (!this.hidePersistentScene) {
       this.persistent.update(timeMs, delta);
 
       // Pass the active scene's albedo texture to persistent scene for glass sampling
       this.persistent.setSceneTexture(prev?.gbuffer.albedo ?? null);
+
+      // Pass the background texture for glass tiles to sample
+      this.persistent.setBackgroundTexture();
 
       if (!this.persistent.isEmpty() && this.persistent.gbuffer) {
         renderer.setRenderTarget(this.persistent.gbuffer.target);
@@ -227,7 +243,9 @@ export class SceneManager {
     // Restore autoClear
     renderer.autoClear = prevAutoClear;
 
-    // Update post material inputs
+    // ═══════════════════════════════════════════════════════════════════════
+    // STEP 5: Composite everything in post-processing
+    // ═══════════════════════════════════════════════════════════════════════
     if (prev || next) {
       const pTex = prev?.gbuffer.albedo ?? next?.gbuffer.albedo;
       const nTex = next?.gbuffer.albedo ?? prev?.gbuffer.albedo;
@@ -243,6 +261,12 @@ export class SceneManager {
         persistentDepth: this.hidePersistentScene
           ? null
           : this.persistent.gbuffer?.depth,
+        background: this.hidePersistentScene
+          ? null
+          : this.persistent.backgroundTexture,
+        backgroundDepth: this.hidePersistentScene
+          ? null
+          : this.persistent.backgroundDepth,
       });
     }
 

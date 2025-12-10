@@ -327,6 +327,16 @@ export class Grid extends THREE.Group {
   }
 
   /**
+   * Set the background texture for glass effect sampling
+   * @param {THREE.Texture} texture - The background plane texture
+   */
+  setBackgroundTexture(texture) {
+    if (this.material?._backgroundTextureNode && texture) {
+      this.material._backgroundTextureNode.value = texture;
+    }
+  }
+
+  /**
    * Get grid info
    * @returns {Object}
    */
