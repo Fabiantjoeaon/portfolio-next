@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
+    "dev:mobile": "HTTPS=true vite",
     "build": "vite build",
     "preview": "vite preview",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -20,5 +21,8 @@
     "tweakpane": "^4.0.5",
     "vite": "^7.2.2",
     "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.1.0"
   }
 }

@@ -113,13 +113,19 @@ export default class PersistentScene {
       position: new THREE.Vector3(0, 0, -5), // Behind other content
     });
 
-    // Update screen plane when grid rebuilds
+    // Update screen plane when grid rebuilds (viewport resize, etc.)
     this.grid.onRebuild((dimensions) => {
       this._updateScreenSize(dimensions);
     });
 
-    // Initial screen size update
-    this._updateScreenSize(this.grid.getDimensions());
+    // Initial screen size update - get dimensions from grid or use viewport
+    const gridDimensions = this.grid.getDimensions();
+    if (gridDimensions.width > 0 && gridDimensions.height > 0) {
+      this._updateScreenSize(gridDimensions);
+    } else {
+      // Fallback: use viewport dimensions converted to world units
+      this._updateScreenSizeFromViewport();
+    }
 
     this.scene.add(this.grid);
   }
@@ -135,8 +141,8 @@ export default class PersistentScene {
     const material = new NodeMaterial();
 
     // Gradient colors - can be customized
-    const color1 = uniform(new THREE.Color(0x1a1a2e)); // Deep blue-purple
-    const color2 = uniform(new THREE.Color(0x16213e)); // Dark navy
+    const color1 = uniform(new THREE.Color(0xfff)); // Deep blue-purple
+    const color2 = uniform(new THREE.Color(0x000)); // Dark navy
     const color3 = uniform(new THREE.Color(0x0f3460)); // Midnight blue
     const speed = uniform(0.3);
 
@@ -191,14 +197,33 @@ export default class PersistentScene {
    * @param {number} padding - Extra padding around the grid
    */
   _updateScreenSize(dimensions, padding = 1.3) {
-    if (!this.screenPlane || !dimensions) return;
+    if (!this.screenPlane) return;
+
+    // Fallback to viewport if dimensions are invalid
+    if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0) {
+      this._updateScreenSizeFromViewport();
+      return;
+    }
 
     const { width, height } = dimensions;
+
+    // Calculate aspect ratio from grid dimensions
+    const gridAspect = width / height;
+
     // Ensure screen is large enough to fill the view
     // At z=-6.5 from camera at z=5 with 75deg FOV, we need ~20+ units
-    const minSize = 30;
-    const screenWidth = Math.max(width + padding * 2, minSize);
-    const screenHeight = Math.max(height + padding * 2, minSize);
+    const minDimension = 30;
+
+    // Use the larger of grid dimensions or minimum, maintaining aspect ratio
+    let screenWidth, screenHeight;
+    if (width >= height) {
+      screenWidth = Math.max(width + padding * 2, minDimension);
+      screenHeight = screenWidth / gridAspect;
+    } else {
+      screenHeight = Math.max(height + padding * 2, minDimension);
+      screenWidth = screenHeight * gridAspect;
+    }
+
     this.screenPlane.scale.set(screenWidth, screenHeight, 1);
   }
 
@@ -231,22 +256,6 @@ export default class PersistentScene {
   }
 
   /**
-   * Sync the persistent camera with a source camera
-   * Copies all camera properties to match the active scene's view.
-   * For objects to stay in world space, position them relative to camera.
-   * @param {THREE.Camera} sourceCamera - Camera to copy properties from
-   */
-  // syncCamera(sourceCamera) {
-  //   this.camera.position.copy(sourceCamera.position);
-  //   this.camera.quaternion.copy(sourceCamera.quaternion);
-  //   this.camera.fov = sourceCamera.fov;
-  //   this.camera.aspect = sourceCamera.aspect;
-  //   this.camera.near = sourceCamera.near;
-  //   this.camera.far = sourceCamera.far;
-  //   this.camera.updateProjectionMatrix();
-  // }
-
-  /**
    * Update the camera aspect ratio
    * @param {number} aspect - New aspect ratio
    */
@@ -255,7 +264,7 @@ export default class PersistentScene {
     this.camera.updateProjectionMatrix();
   }
 
-  async update(time, delta) {
+  update(time, delta) {
     if (this.testObject) {
       this.testObject.rotation.x = time * 0.0005;
       this.testObject.rotation.y = time * 0.001;
@@ -263,7 +272,7 @@ export default class PersistentScene {
 
     // Update grid compute shader
     if (this.grid) {
-      await this.grid.update(time, delta);
+      this.grid.update(time, delta);
     }
   }
 
@@ -310,14 +319,15 @@ export default class PersistentScene {
     if (this.gbuffer) {
       this.gbuffer.resize(width, height, devicePixelRatio);
     }
-  }
 
-  /**
-   * Get the grid instance for external configuration
-   * @returns {Grid}
-   */
-  getGrid() {
-    return this.grid;
+    // Update screen plane size - grid will handle its own resize via viewport store
+    // We update from viewport in case grid hasn't resized yet
+    if (this.grid) {
+      const dimensions = this.grid.getDimensions();
+      if (dimensions.width > 0 && dimensions.height > 0) {
+        this._updateScreenSize(dimensions);
+      }
+    }
   }
 
   /**
@@ -331,6 +341,16 @@ export default class PersistentScene {
   }
 
   /**
+   * Set the scene depth texture for depth-based compositing
+   * @param {THREE.Texture} texture - The scene depth texture
+   */
+  setSceneDepth(texture) {
+    if (this.grid) {
+      this.grid.setSceneDepth(texture);
+    }
+  }
+
+  /**
    * Set the screen texture for glass effect sampling
    * @param {THREE.Texture} texture - The screen texture (or null to use internal)
    */
@@ -338,26 +358,9 @@ export default class PersistentScene {
     if (this.grid) {
       // Use provided texture or fall back to internal screen render
       this.grid.setScreenTexture(texture ?? this.screenTexture);
+      // Also pass screen depth for depth-based compositing
+      this.grid.setScreenDepth(this.screenDepth);
     }
-  }
-
-  /**
-   * Get the screen plane for external configuration
-   * @returns {THREE.Mesh}
-   */
-  getScreenPlane() {
-    return this.screenPlane;
-  }
-
-  /**
-   * Get the combined scene for water reflections (includes screen plane)
-   * This returns a scene that includes both the screen plane and the grid
-   * @returns {THREE.Scene}
-   */
-  getReflectionScene() {
-    // Return the screen scene which has the gradient plane
-    // The water can reflect this along with the main scene
-    return this.screenScene;
   }
 
   /**

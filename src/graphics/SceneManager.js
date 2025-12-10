@@ -8,7 +8,7 @@ import { getFlag } from "../lib/query.js";
 
 let _nextSceneId = 1;
 
-export const GROUND_Y = -7;
+export const GROUND_Y = -9;
 
 export class SceneManager {
   constructor(
@@ -222,10 +222,11 @@ export class SceneManager {
     if (!this.hidePersistentScene) {
       this.persistent.update(timeMs, delta);
 
-      // Pass the active scene's albedo texture to persistent scene for glass sampling
+      // Pass the active scene's textures to persistent scene for glass sampling
       this.persistent.setSceneTexture(prev?.gbuffer.albedo ?? null);
+      this.persistent.setSceneDepth(prev?.gbuffer.depth ?? null);
 
-      // Pass the screen texture for glass tiles to sample
+      // Pass the screen texture for glass tiles to sample (includes depth)
       this.persistent.setScreenTexture();
 
       if (!this.persistent.isEmpty() && this.persistent.gbuffer) {

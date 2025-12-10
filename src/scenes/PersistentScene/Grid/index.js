@@ -150,6 +150,7 @@ export class Grid extends THREE.Group {
     this.material = createTileMaterial({ color, opacity });
 
     // Create instanced mesh
+    // TODO: Do we need to do this?
     this.mesh = new THREE.InstancedMesh(
       this.geometry,
       this.material,
@@ -235,85 +236,8 @@ export class Grid extends THREE.Group {
     this.compute.update(time * 0.001, delta); // Convert to seconds
 
     // Run compute shader
-    await this.renderer.computeAsync(this.compute.getComputeNode());
-  }
-
-  /**
-   * Set the grid size (number of columns)
-   * @param {number} size - Number of columns (rows auto-calculated from aspect)
-   */
-  setSize(size) {
-    this.config.size = size;
-    const { viewport } = useViewportStore.getState();
-    this._onViewportChange(viewport);
-  }
-
-  /**
-   * Set tile size (only works when size config is null)
-   * @param {number} tileSize - New tile size
-   */
-  setTileSize(tileSize) {
-    this.config.tileSize = tileSize;
-    const { viewport } = useViewportStore.getState();
-    this._onViewportChange(viewport);
-  }
-
-  /**
-   * Set gap between tiles
-   * @param {number} gap - New gap size
-   */
-  setGap(gap) {
-    this.config.gap = gap;
-    const { viewport } = useViewportStore.getState();
-    this._onViewportChange(viewport);
-  }
-
-  /**
-   * Set tile depth/thickness
-   * @param {number} depth - New depth value
-   */
-  setDepth(depth) {
-    this.config.depth = depth;
-    this._rebuild();
-  }
-
-  /**
-   * Set bevel options
-   * @param {Object} bevel - { enabled, thickness, size, segments }
-   */
-  setBevel(bevel) {
-    this.config.bevel = { ...this.config.bevel, ...bevel };
-    this._rebuild();
-  }
-
-  /**
-   * Set wave animation parameters
-   * @param {Object} params - { amplitude, frequency, speed }
-   */
-  setWaveParams(params) {
-    if (this.compute) {
-      this.compute.setWaveParams(params);
-    }
-  }
-
-  /**
-   * Set base color
-   * @param {number|THREE.Color} color - New base color
-   */
-  setColor(color) {
-    if (this.material?.uniforms?.baseColor) {
-      this.material.uniforms.baseColor.value.set(color);
-    }
-  }
-
-  /**
-   * Set base opacity
-   * @param {number} opacity - New opacity (0-1)
-   */
-  setOpacity(opacity) {
-    if (this.material?.uniforms?.opacity) {
-      this.material.uniforms.opacity.value = opacity;
-    }
+    // await this.renderer.computeAsync(this.compute.getComputeNode());
+    this.renderer.compute(this.compute.getComputeNode());
   }
 
   /**
@@ -337,20 +261,23 @@ export class Grid extends THREE.Group {
   }
 
   /**
-   * Get grid info
-   * @returns {Object}
+   * Set the scene depth texture for depth-based compositing
+   * @param {THREE.Texture} texture - The scene depth texture
    */
-  getInfo() {
-    return {
-      cols: this.cols,
-      rows: this.rows,
-      count: this.count,
-      size: this.config.size,
-      tileSize: this._computedTileSize ?? this.config.tileSize,
-      gap: this.config.gap,
-      depth: this.config.depth,
-      bevel: this.config.bevel,
-    };
+  setSceneDepth(texture) {
+    if (this.material?._sceneDepthNode && texture) {
+      this.material._sceneDepthNode.value = texture;
+    }
+  }
+
+  /**
+   * Set the screen depth texture for depth-based compositing
+   * @param {THREE.Texture} texture - The screen depth texture
+   */
+  setScreenDepth(texture) {
+    if (this.material?._screenDepthNode && texture) {
+      this.material._screenDepthNode.value = texture;
+    }
   }
 
   /**

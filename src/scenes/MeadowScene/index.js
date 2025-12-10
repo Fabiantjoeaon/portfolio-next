@@ -41,7 +41,8 @@ export default class MeadowScene extends BaseScene {
       new THREE.MeshBasicMaterial({ color: 0xff0000 })
     );
     this.cube.position.x = -20;
-    this.cube.position.y = -10;
+    this.cube.position.y = 3;
+    this.cube.position.z = -50;
     this.scene.add(this.cube);
 
     // Create custom water with external reflection support
@@ -49,8 +50,10 @@ export default class MeadowScene extends BaseScene {
       waterNormals,
       sunDirection: new THREE.Vector3(5, 10, 5).normalize(),
       sunColor: 0xffffff,
-      waterColor: 0x629eda,
+      // waterColor: 0x629eda,
+
       distortionScale: 1.7,
+      // alpha: 0.5,
       alpha: 1,
       externalReflectionStrength: 0.7,
     });
@@ -73,14 +76,9 @@ export default class MeadowScene extends BaseScene {
   setPersistentScene(renderer, persistentScene, camera, viewport, screenScene) {
     if (!this.water) return;
 
-    // Need at least one scene to reflect
-    const hasContent =
-      persistentScene?.children?.length > 0 ||
-      screenScene?.children?.length > 0;
-    if (!hasContent) return;
-
     if (!this._externalSceneInitialized) {
       const { width, height, devicePixelRatio } = viewport;
+
       const w = Math.round(width * devicePixelRatio * 0.5);
       const h = Math.round(height * devicePixelRatio * 0.5);
       // Pass both scenes - water will render them both

@@ -441,6 +441,7 @@ TSL is JavaScript that builds shader node graphs. Code executes at TWO times:
     texture(tex)                    // sample at default UV
     texture(tex, uv)                // sample at UV
     texture(tex, uv, level)         // sample with LOD
+    sample(tex)                     // sample from UV node, do not use .sample() as deprecated
     cubeTexture(tex, direction)     // cubemap
     triplanarTexture(texX, texY, texZ, scale, pos, normal)
 

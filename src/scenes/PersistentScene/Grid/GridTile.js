@@ -95,8 +95,6 @@ export function createTileGeometry(
 
   // Center the geometry along z-axis so it extrudes equally front/back
   geometry.translate(0, 0, -depth / 2);
-
-  // Compute normals for proper lighting
   geometry.computeVertexNormals();
 
   return geometry;
@@ -124,13 +122,14 @@ export function createTileMaterial(options = {}) {
   const tintStrength = uniform(options.tintStrength ?? 0.15);
 
   // Create placeholder textures for proper shader compilation
-  // These will be replaced with actual textures during rendering
-  const scenePlaceholder = createPlaceholderTexture(TRANSPARENT_BLACK);
-  const screenPlaceholder = createPlaceholderTexture(SCREEN_COLOR);
 
-  // Two texture sources for layered refraction
-  const sceneTextureNode = texture(scenePlaceholder); // Active scene (e.g., meadow)
-  const screenTextureNode = texture(screenPlaceholder); // Persistent screen plane
+  // Color textures
+  const sceneTextureNode = texture(); // Active scene (e.g., meadow)
+  const screenTextureNode = texture(); // Persistent screen plane
+
+  // Depth textures for proper compositing
+  const sceneDepthNode = texture();
+  const screenDepthNode = texture();
 
   // Instance attributes - these will be set by the InstancedMesh
   // instancePosition: base grid position (vec3)
@@ -163,11 +162,16 @@ export function createTileMaterial(options = {}) {
     // Sample scene texture (active scene content)
     const sceneSample = sceneTextureNode.sample(refractedUV);
     const sceneColor = sceneSample.rgb;
-    const sceneAlpha = sceneSample.a;
 
-    // Composite: scene over screen using scene's alpha
-    // Where scene has content (alpha > 0), show scene; otherwise show screen
-    const compositedColor = mix(screenColor, sceneColor, sceneAlpha);
+    // Sample depth textures (lower value = closer to camera)
+    const sceneDepth = sceneDepthNode.sample(refractedUV).x;
+    const screenDepth = screenDepthNode.sample(refractedUV).x;
+
+    // Depth-based compositing: show whichever layer is closer
+    // If screen depth < scene depth, screen is in front, show screen
+    // Otherwise show scene
+    const showScreen = screenDepth.lessThan(sceneDepth).toFloat();
+    const compositedColor = mix(sceneColor, screenColor, showScreen);
 
     // Calculate fresnel for edge highlights (glass rim effect)
     const viewDir = normalize(sub(cameraPosition, positionWorld));
@@ -188,6 +192,7 @@ export function createTileMaterial(options = {}) {
     const finalAlpha = mul(opacityUniform, instanceColor.w);
 
     return vec4(finalColor, finalAlpha);
+    //return screenSample;
   })();
 
   // Material settings
@@ -207,6 +212,8 @@ export function createTileMaterial(options = {}) {
   // Store texture nodes separately for updating
   material._sceneTextureNode = sceneTextureNode;
   material._screenTextureNode = screenTextureNode;
+  material._sceneDepthNode = sceneDepthNode;
+  material._screenDepthNode = screenDepthNode;
 
   return material;
 }
