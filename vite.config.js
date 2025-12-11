@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite';
-import basicSsl from '@vitejs/plugin-basic-ssl';
+import { defineConfig } from "vite";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 
-const useHttps = process.env.HTTPS === 'true';
+const useHttps = process.env.HTTPS === "true";
 
 export default defineConfig({
   plugins: useHttps ? [basicSsl()] : [],
@@ -9,4 +9,3 @@ export default defineConfig({
     host: useHttps,
   },
 });
-

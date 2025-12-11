@@ -94,13 +94,13 @@ export default class PersistentScene {
   }
 
   /**
-   * Setup the GPU-driven grid
+   * Setup z`the GPU-driven grid
    */
   _setupGrid() {
     this.grid = new Grid({
       size: 16, // Number of columns (rows auto-calculated from aspect ratio)
       gap: 0.37,
-      cornerRadius: 0.12,
+      cornerRadius: 0.08,
       depth: 0.08,
       bevel: {
         enabled: true,
