@@ -1,5 +1,6 @@
 import { texture, uv, uniform, vec3, mix, step, float, min } from "three/tsl";
 import { MeshBasicNodeMaterial } from "three/webgpu";
+import * as THREE from "three/webgpu";
 
 /**
  * Fullscreen post material that blends scenes with proper depth compositing.
@@ -33,9 +34,38 @@ export class PostProcessingMaterial {
     this.transition = null;
     this.postprocessingChain = null;
 
+    // Camera uniforms for volumetric effects
+    this.cameraNear = uniform(0.1);
+    this.cameraFar = uniform(1000);
+    this.cameraProjectionMatrix = uniform(new THREE.Matrix4());
+    this.cameraProjectionMatrixInverse = uniform(new THREE.Matrix4());
+    this.cameraMatrixWorld = uniform(new THREE.Matrix4());
+
     this.rebuildGraph();
 
     this.uvNode = uv();
+  }
+
+  /**
+   * Update camera uniforms for effects that need depth reconstruction.
+   * Call this before rendering when camera changes.
+   */
+  setCameraData(camera) {
+    if (!camera) return;
+
+    this.cameraNear.value = camera.near;
+    this.cameraFar.value = camera.far;
+
+    // Copy projection matrix
+    this.cameraProjectionMatrix.value.copy(camera.projectionMatrix);
+
+    // Compute inverse projection matrix
+    this.cameraProjectionMatrixInverse.value
+      .copy(camera.projectionMatrix)
+      .invert();
+
+    // Copy camera world matrix (inverse view matrix)
+    this.cameraMatrixWorld.value.copy(camera.matrixWorld);
   }
 
   rebuildGraph() {
@@ -164,6 +194,12 @@ export class PostProcessingMaterial {
           nextTex: this.nextTex,
           nextNormal: this.nextNormal,
           nextDepth: this.nextDepth,
+          // Camera uniforms for volumetric effects (world position reconstruction)
+          cameraNear: this.cameraNear,
+          cameraFar: this.cameraFar,
+          cameraProjectionMatrix: this.cameraProjectionMatrix,
+          cameraProjectionMatrixInverse: this.cameraProjectionMatrixInverse,
+          cameraMatrixWorld: this.cameraMatrixWorld,
         };
 
         for (const fx of this.postprocessingChain) {

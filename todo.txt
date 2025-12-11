@@ -81,6 +81,7 @@ https://www.reddit.com/r/GraphicsProgramming/comments/1aqj2dc/volumetric_fog_god
 ^ find out whats most performant
 
 - MSDF text
+    - use this: https://github.com/CasulOrnstein/three-msdf-text-webgpu
     - https://webgpu.github.io/webgpu-samples/?sample=textRenderingMsdf
     - https://github.com/leochocolat/three-msdf-text-utils?tab=readme-ov-file
 

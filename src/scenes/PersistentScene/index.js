@@ -143,9 +143,9 @@ export default class PersistentScene {
     material.transparent = true;
 
     // Gradient colors - can be customized
-    const color1 = uniform(new THREE.Color(0xfff)); // Deep blue-purple
-    const color2 = uniform(new THREE.Color(0x000)); // Dark navy
-    const color3 = uniform(new THREE.Color(0x0f3460)); // Midnight blue
+    const color1 = uniform(new THREE.Color(0xff0000)); // Deep blue-purple
+    const color2 = uniform(new THREE.Color(0xff0000)); // Dark navy
+    const color3 = uniform(new THREE.Color(0xff0000)); // Midnight blue
     const speed = uniform(0.3);
 
     material.colorNode = Fn(() => {
@@ -174,8 +174,7 @@ export default class PersistentScene {
         blend.mul(0.5).add(0.25)
       );
 
-      // return vec4(finalColor, float(1.0));
-      return vec4(finalColor, float(fract(time.mul(0.1))));
+      return vec4(finalColor, float(1.0));
     })();
 
     // Store uniforms for external access

@@ -250,6 +250,13 @@ export class SceneManager {
     // ═══════════════════════════════════════════════════════════════════════
     // STEP 5: Composite everything in post-processing
     // ═══════════════════════════════════════════════════════════════════════
+
+    // Ensure camera matrices are up-to-date before passing to post-processing
+    camera.updateMatrixWorld(true);
+
+    // Update camera data for volumetric effects
+    this.post.material.setCameraData(camera);
+
     if (prev || next) {
       const pTex = prev?.gbuffer.albedo ?? next?.gbuffer.albedo;
       const nTex = next?.gbuffer.albedo ?? prev?.gbuffer.albedo;
