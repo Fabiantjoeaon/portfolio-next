@@ -73,7 +73,7 @@ export default class TestScene extends BaseScene {
     try {
       // Load rose VAT with FBX
       const { geometry, vatTexture, remapInfo } = await vatLoader.load(
-        "/assets/scenes/meadow/flowers/rose_vat/GNRose",
+        "/assets/scenes/meadow/flowers/rose_vat_v2/GNRoseV2",
         "fbx"
       );
 
@@ -81,8 +81,12 @@ export default class TestScene extends BaseScene {
       const frameCount = remapInfo.frames;
       const vertexCount = vatTexture.image.width;
 
-      console.log(`Rose VAT: ${vertexCount} VAT vertices, ${frameCount} frames`);
-      console.log(`Rose VAT: Geometry has ${geometry.attributes.position.count} mesh vertices`);
+      console.log(
+        `Rose VAT: ${vertexCount} VAT vertices, ${frameCount} frames`
+      );
+      console.log(
+        `Rose VAT: Geometry has ${geometry.attributes.position.count} mesh vertices`
+      );
       console.log(`Rose VAT: Bounds min:`, remapInfo.min);
       console.log(`Rose VAT: Bounds max:`, remapInfo.max);
 
@@ -115,7 +119,11 @@ export default class TestScene extends BaseScene {
       this.frameCount = frameCount;
       this.vatVertexCount = vertexCount;
 
-      console.log(`Rose: Added mesh with ${geometry.index ? geometry.index.count / 3 : "N/A"} triangles`);
+      console.log(
+        `Rose: Added mesh with ${
+          geometry.index ? geometry.index.count / 3 : "N/A"
+        } triangles`
+      );
     } catch (error) {
       console.error("Failed to load rose VAT:", error);
     }
