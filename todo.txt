@@ -6,6 +6,12 @@ RENDER PLAN:
 - the water should be able to refract/reflect everything from active scene to persistent scene (currently implemented)
 - each scene can have custom post processing (currently implemented), this does not have to affect persistent scene (if its not at extra performance cost its fine to affect is as well), but the persistent scene is always rendered to depth buffer that can be used by post processing so it can be taken into account for for screen space effects
 
+Daily reminder that matcaps are cheap, and a shader that transitions between matcaps can fake changes in environmental lighting (like position/time) :wink: https://github.com/nidorx/matcaps I’ll open source my C4D file for generating matcaps if anyone's interested
+
+- Bent norMALS: https://discourse.threejs.org/t/get-bent-or-what-is-normal-today-anyway/88635
+
+Shade (my graphics engine) is a deferred renderer, so are most AAA graphics engines out there. One of the major reasons is that you need a g-buffer for most of the post-processing stack anyway, so you might as well go full deferred.
+
 flowchart TD
     subgraph current [Current Flow]
         A1[Active Scene] --> G1[Active GBuffer]
@@ -31,6 +37,8 @@ https://www.instagram.com/p/DQ3_7AHiIk2/?img_index=1
 
 https://x.com/i/bookmarks
 
+https://mingjyunhung.com/
+
 - Description: With the rise of AI, people stealing stuff all over the internet, 
 and no code tools being better than ever [keep the craft of creative coding alive]
 
@@ -38,8 +46,10 @@ WATER
 - refract water / content below?
 
 
+
 VAT
 - https://x.com/mingjyunhung/status/1995855482171654479 (be sure to credit)
+
 - how to get easy variations?
 - can do 2 flowers, then color variations, petals, some only stem
 

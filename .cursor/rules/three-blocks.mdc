@@ -1,0 +1,7 @@
+---
+description: Three Blocks API
+globs: **/*.{js,ts,jsx,tsx}
+alwaysApply: true
+---
+
+@https://threejs-blocks.com/llms.txt

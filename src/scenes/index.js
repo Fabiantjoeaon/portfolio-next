@@ -7,12 +7,12 @@ import TestScene from "./TestScene.js";
 // You can add more scenes here; each entry may be a class or { Scene, config }
 
 export const orderedScenes = [
-  {
-    Scene: TestScene,
-  },
   // {
-  //   Scene: MeadowScene,
+  //   Scene: TestScene,
   // },
+  {
+    Scene: MeadowScene,
+  },
   // {
   //   Scene: SequenceScene,
   // },

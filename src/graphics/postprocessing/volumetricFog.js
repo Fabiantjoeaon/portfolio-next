@@ -36,13 +36,13 @@ export function volumetricFog(colorNode, context, fogConfig = {}) {
     mixNode,
     cameraNear,
     cameraFar,
-    cameraInverseProjectionMatrix,
-    cameraViewMatrixInverse,
+    cameraProjectionMatrixInverse,
+    cameraMatrixWorld,
   } = context;
 
-  if (!uvNode || !prevDepth || !cameraNear || !cameraFar) {
-    return colorNode;
-  }
+  //   if (!cameraProjectionMatrixInverse || !cameraMatrixWorld) {
+  //     return colorNode;
+  //   }
 
   const {
     noiseTexture,
@@ -99,16 +99,16 @@ export function volumetricFog(colorNode, context, fogConfig = {}) {
     const clipPos = vec4(ndcX, ndcY, float(1.0), float(1.0));
 
     // 3. Transform to view space to get ray direction
-    const viewPos4 = cameraInverseProjectionMatrix.mul(clipPos);
+    const viewPos4 = cameraProjectionMatrixInverse.mul(clipPos);
     const viewRayDir = viewPos4.xyz.div(viewPos4.w).normalize();
 
     // 4. Transform ray direction to world space (w=0 for direction)
-    const worldRayDir = cameraViewMatrixInverse
+    const worldRayDir = cameraMatrixWorld
       .mul(vec4(viewRayDir, 0.0))
       .xyz.normalize();
 
     // 5. Camera position in world space
-    const camPos = cameraViewMatrixInverse.mul(vec4(0, 0, 0, 1)).xyz;
+    const camPos = cameraMatrixWorld.mul(vec4(0, 0, 0, 1)).xyz;
 
     // 6. World position = camera + ray * depth
     // But linearDepth is along view Z, we need distance along the ray
